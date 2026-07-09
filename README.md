@@ -11,9 +11,9 @@ The live demo runs entirely in your browser. It ships with a domain-restricted G
 
 ## Screenshots
 
-![Ride](screenshots/ride.jpeg)
-![Overview](screenshots/overview.jpeg)
-![Setup](screenshots/setup.jpeg)
+![Ride](screenshots/ride.webp)
+![Overview](screenshots/overview.webp)
+![Setup](screenshots/setup.webp)
 
 ## Why GPX Rider?
 
