@@ -30,7 +30,7 @@ jobs:
       - name: Inject deploy config
         env:
           MAPS_API_KEY: ${{ secrets.MAPS_API_KEY }}
-          HEAD: ${{ vars.HEAD }}
+          HEAD: ${{ vars.WEB_HTML_HEAD }}
         run: python3 scripts/inject_maps_api_key.py
 
       - name: Generate gallery data
