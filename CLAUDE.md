@@ -24,14 +24,35 @@ Everything the browser loads lives in `app/`, which is what GitHub Pages
 deploys as the site root. `app/index.html` is the **public landing page**
 (hero replay + marketing sections, driven by `app/landing.mjs`); its "Launch
 GPX Rider" links point to `app.html`, the actual application. `app/app.js` is
-the application's only entry point (loaded as a module from `app/app.html`);
-it owns the mutable `state` object, the DOM element map (`els`), event wiring,
-the Google 3D map + follow camera, and the movement loop. Everything else is a
-focused module:
+the application's only entry point (loaded as a module from `app/app.html`),
+and it is deliberately **thin**: it boots the app (`startApp`) and wires DOM
+events to the feature modules (`bindEvents`) — nothing else. All shared
+mutable state lives in `state.mjs`; every behavior lives in a focused module:
 
 | File | Responsibility |
 |---|---|
-| `app/app.js` | Orchestrator: state, DOM, map rendering, camera capture, movement loop, settings & saved-ride persistence |
+| `app/app.js` | Entry point, deliberately thin: `startApp()` boot sequence + `bindEvents()` DOM event wiring. **No logic lives here** — adding a feature means an import and a listener line, nothing more |
+| `app/state.mjs` | Shared app foundation: the single mutable `state` object, the DOM element map `els`, and `updateProgressLabel`. Bottom of the feature import graph — it must never import a feature module |
+| `app/map-init.mjs` | Maps API key resolution/saving, Google Maps JS loader, 3D map + minimap creation |
+| `app/route-load.mjs` | GPX file/URL intake, `applyGpxText` route-swap sequence, once-per-load route overview (name chip, difficulty tile, climbs list) |
+| `app/route-render.mjs` | Map geometry: elevated 3D route lines, rider dot mesh + fallback ring, rider beacon, minimap route/marker (see the rider-dot design notes below) |
+| `app/movement.mjs` | The movement loop (`tick`), simulation toggle, pedaling detection/hysteresis, ride reset, seek |
+| `app/demo-mode.mjs` | Demo mode UI: drives the ride from `demo.mjs`'s synthetic trainer/HR model, demo chip/banner sync |
+| `app/theater-mode.mjs` | Theater mode: pinning the map viewport to the exact recording size |
+| `app/ride-ui.mjs` | `updateRideUi`: the per-tick UI driver — per-frame camera/dot work, then slow-cadence DOM stats, progress bars, HUD tiles, dock readouts, ETA |
+| `app/profile-ui.mjs` | Elevation profile canvas wiring: rendering + hover/click-to-seek/drag-to-select interactions (drawing math stays in `profile.mjs`) |
+| `app/climbs-ui.mjs` | Climb/segment focus (seek + highlight + focused camera), live current/next-climb status, the map HUD climb/segment banner |
+| `app/training-zones.mjs` | HR/power zone calculation from the rider profile, fullscreen zone meters, settings zone summaries + help popovers |
+| `app/telemetry-ui.mjs` | Trainer/HR telemetry callbacks, HR source-of-truth resolution, calories/ride-timer accessors, telemetry readouts |
+| `app/recording-ui.mjs` | FIT buffer card, FIT download, clear-ride-data confirmation (recording itself: `recorder.mjs`; encoding: `fit.mjs`) |
+| `app/follow-camera.mjs` | Follow/first-person camera targets, the chase flight (`stepCameraFlight` + loop), terrain avoidance, manual-drag capture |
+| `app/overview-camera.mjs` | Overview state machine: static/satellite framing, animated orbit/fly-by/fly-over loop, finish-line orbit, return-to-rider |
+| `app/camera-ui.mjs` | Camera UI wiring: map action-bar overview/camera-view controls + menus, Settings › Camera & view sliders, first-person preset, reset-camera button state |
+| `app/settings-ui.mjs` | Settings dialog shell (tabs) + every non-camera settings panel: units, rider profile, display & HUD toggles, rendering, screenshot settings |
+| `app/map-hud.mjs` | Map HUD & fullscreen surface: clock chip, HUD tile order/visibility + drag-reorder, metric tile layout, data dock collapse, fullscreen enter/exit, map screenshot action |
+| `app/camera-debug.mjs` | Camera debug overlay readout + the red overview travel-path debug line |
+| `app/gallery-export.mjs` | Export to gallery card: metadata.json snippet with the live preview camera, clipboard copy |
+| `app/persistence.mjs` | Settings & saved-ride persistence: `restoreSettings`/`saveSettings`, `restoreSavedRide`/`saveRide` (the one deliberately cross-cutting module) |
 | `app/tuning.mjs` | **All tunable behavior parameters**, one documented constant each (defaults, thresholds, model factors). New knobs go here, not inline |
 | `app/camera.mjs` | Pure follow-camera math (tested) |
 | `app/flyover.mjs` | Pure animated-overview math (tested): orbit turntable camera + orbit debug path |
@@ -48,16 +69,93 @@ focused module:
 | `app/fit.mjs` | Minimal FIT activity encoder — tags rides as sport=cycling, sub_sport=virtual_activity (tested) |
 | `app/units.mjs` | km/mi + kcal/kJ display formatting; internal state is always metric (tested) |
 | `app/screenshot.mjs` | One-click JPG of the map viewport via tab capture (`getDisplayMedia`) — the 3D map canvas sits in a closed shadow root and cannot be read directly |
-| `app/gallery.mjs` | Fullscreen ride-gallery overlay (`<dialog#galleryDialog>`): route cards from `app/gallery.json` — all stats/card data is precomputed by `generate_gallery_json.py`, while the preview is a live interactive Google 3D map using each route's `metadata.json#previewCamera` (falling back to the normal overview framing). |
+| `app/gallery.mjs` | Fullscreen ride-gallery overlay (`<dialog#galleryDialog>`): route cards from `app/gallery.json` — all stats/card data is precomputed by `generate_gallery_json.py`. Each card starts with a lightweight classic satellite map and route trace; its square `Show 3D` button creates the Photorealistic 3D preview on demand using `metadata.json#previewCamera` (falling back to the normal overview framing). |
 | `app/storage.mjs` | Persistence: IndexedDB behind a sync in-memory cache (localStorage fallback + one-time migration; tested) |
 | `app/config.mjs` | `deployedMapsApiKey()` — empty in source, rewritten at deploy time (see below) |
 | `app/index.html` + `app/landing.mjs` | **Public landing page.** A no-build port of the Claude Design "GPX Rider Landing" prototype: a hero that replays one route (`landing-route.mjs`) over a live Google Photorealistic 3D map with a faked HUD, then a summit orbit, then loops; below it, static marketing sections. Reuses the app's Maps-key resolution (visitor key wins over the deploy-time key), and can optionally show a still fallback via `LANDING_HERO.fallbackImagePath` when no map is available. All hero knobs live in `LANDING_HERO` (`tuning.mjs`). "Launch GPX Rider" deep-links the Ještěd gallery route (`app.html?route=0050_jested`). |
 | `app/landing-route.mjs` | Static route data (`[lat, lng, ele]`) the landing hero replays, downsampled from `gallery/0050_jested/export.gpx`. Marketing data, not part of the app runtime |
 
-Module conventions: browser modules use the `.mjs` extension (except the
-`app.js` entry point), pure logic goes in its own module with tests, and
-hardware/IO modules (`trainer.mjs`, `heartrate.mjs`) hold their own internal
-state and talk back to `app.js` only through `init*()` callbacks.
+## Code organization system — how to keep this codebase clean
+
+`app.js` was once a 5000-line monolith; it is now ~300 lines of boot + event
+wiring and must stay that way. The rules below are the system that keeps it
+so. Follow them mechanically — they are written so that any agent, regardless
+of context budget, can make a change without re-deriving the architecture.
+
+### The layers (import direction flows downward only)
+
+1. **`tuning.mjs`** — constants only. Imports nothing app-level.
+2. **Pure logic modules** (`geo`, `camera`, `route`, `eta`, `difficulty`,
+   `climbs`, `units`, `fit`, `flyby`, `flyover`, `demo`, `route-style`,
+   `profile`) — no DOM, no app state, no imports from higher layers. Every
+   one of these is unit-testable; most are tested.
+3. **Hardware/IO modules** (`trainer`, `heartrate`, `recorder`, `storage`,
+   `screenshot`) — own their internal state, talk upward only through
+   `init*()` callbacks or plain return values.
+4. **`state.mjs`** — the shared mutable `state` object + the `els` DOM map +
+   `updateProgressLabel`. It may import only layers 1–3 (in practice:
+   `tuning.mjs` and `eta.mjs`). **Never add functions or feature logic here,
+   and never make it import a feature module** — it is the bottom of the
+   feature graph precisely so everything above can import it freely.
+5. **Feature modules** (`*-ui.mjs`, `movement`, `map-init`, `route-load`,
+   `route-render`, `follow-camera`, `overview-camera`, `map-hud`,
+   `persistence`, …) — import `state`/`els` from `state.mjs`, pure helpers
+   from layers 1–3, and *each other's exported functions*. Circular imports
+   **between feature modules** are expected and safe because they only export
+   top-level function declarations that are called at runtime; what is NOT
+   safe is running another feature module's code at module-evaluation time
+   (top-level calls, or computing a module-level `const` from another feature
+   module). Keep module top levels to imports, constants, and function
+   declarations.
+6. **`app.js`** — boot (`startApp`) + event wiring (`bindEvents`). Nothing
+   else, ever.
+
+### Where does my change go?
+
+- **New behavior** → a new focused module, or the one existing module whose
+  header comment names that responsibility. Every module starts with a
+  comment stating what it owns; if your change doesn't fit any header, that
+  is the signal to create a new module, not to stretch an existing one.
+- **New event listener** → the handler lives in a feature module; `app.js`
+  gets only the import + `addEventListener` line.
+- **New shared state field** → add it to the `state` object in `state.mjs`
+  with a comment; new DOM element → add it to `els`. No module-level mutable
+  state in feature modules (animation/poll loops keep their "am I running"
+  flag on `state`, e.g. `movementLoopActive`).
+- **New tunable** → `tuning.mjs`, same change (existing rule, see below).
+- **New persisted setting** → four places, all in the same change:
+  a `DEFAULT_*` in `tuning.mjs`, the field in `state.mjs`, read+clamp in
+  `restoreSettings` and the key in `saveSettings` (`persistence.mjs`), and
+  the feature's own `sync*`/`apply*` functions. `persistence.mjs` is the one
+  module that is *allowed* to touch everything — persistence is inherently
+  cross-cutting; don't try to split it.
+- **New pure computation** → its own layer-2 module (or an existing one),
+  with unit tests in `tests/`.
+
+### Module hygiene rules
+
+- One module = one responsibility, stated in its header comment. If a module
+  needs an "and" in its header that isn't cosmetic, split it.
+- Keep feature modules roughly **under 400 lines**. `app.js` stays under
+  ~350. A module trending past that is due for a split in the same PR.
+- Export **only** what other modules or `bindEvents` actually call; keep
+  helpers unexported. When you stop using an import, delete it.
+- Never reach around a module's exports (no duplicating a private helper
+  from another module — export it or move it).
+- `.mjs` extension for all browser modules (`app.js` is the sole exception).
+
+### Verification checklist (run every time, in this order)
+
+1. `node --check app/<file>.mjs` for each file you touched (syntax).
+2. `make test` (pure-module regressions).
+3. Boot the app in a real browser (`make run`, open
+   `http://127.0.0.1:5173/app/app.html`) and check the devtools console:
+   **import/export name mismatches and missing imports only surface at
+   runtime in a no-build app** — a clean `node --check` does not prove the
+   module graph links. Load a route, start the simulation, confirm no
+   console errors.
+4. If you added/renamed/split a module, update the module table above and
+   mirror the edit in `AGENTS.md`.
 
 Tunable parameters (defaults, thresholds, physics/model factors) live in
 `app/tuning.mjs` with a doc comment each — never as inline magic values —
@@ -79,7 +177,7 @@ in place).
   pedal auto-stops a running simulation; the button must never control the
   trainer-driven movement. Pedaling detection uses hysteresis
   (`PEDALING_START_KPH` / `PEDALING_STOP_KPH` in `tuning.mjs`).
-- **The movement loop** (`tick` in `app.js`) runs on requestAnimationFrame
+- **The movement loop** (`tick` in `movement.mjs`) runs on requestAnimationFrame
   while the tab is visible and falls back to `setTimeout` when hidden, so
   rides keep advancing and recording in background tabs. Per-tick elapsed
   time is clamped (`MAX_TICK_SECONDS`) to avoid teleporting.
@@ -118,11 +216,11 @@ in place).
   `generate_gallery_json.py#mini_bar_color` (which bakes the mini-profile bar
   colors into `gallery.json`), and the `.profile-legend` swatches — keep them
   in sync. `gradeColor` is exported and reused (not re-copied) by the
-  fullscreen climb banner's mini-profile in `app.js`; the climb-category chip
+  fullscreen climb banner's mini-profile in `climbs-ui.mjs`; the climb-category chip
   colors in `CLIMB_CATEGORIES` (`tuning.mjs`) track the same palette.
 - **Settings dialog.** A single `<dialog#settingsDialog>` with a left
   category rail (`[data-settings-tab]`) and a right panel per category
-  (`[data-settings-panel]`); `selectSettingsTab` in `app.js` toggles the
+  (`[data-settings-panel]`); `selectSettingsTab` in `settings-ui.mjs` toggles the
   `active` tab, shows the matching panel, and copies the tab's
   `data-panel-title`/`data-panel-subtitle` into the header. `openSettings(tab)`
   opens on a given category (first-run key prompt opens on `"data"`). All the
@@ -147,7 +245,7 @@ in place).
   keeping the debug overlay active. It exists mainly to compare a requested
   camera against what Google honours after a manual drag (e.g. how far a tilt
   is respected at a given range). While active and the selected overview mode is
-  `"orbit"`, `"flyby"` or `"flyover"`, app.js also draws that mode's travel path
+  `"orbit"`, `"flyby"` or `"flyover"`, `camera-debug.mjs` also draws that mode's travel path
   as a red `Polyline3DElement` configured by `OVERVIEW_DEBUG_LINE_*`; for orbit
   this is the camera eye's ground track, for fly-by the fitted travel ellipse,
   and for fly-over the fitted figure-eight. It stays visible if the user drags
@@ -218,7 +316,7 @@ in place).
   resize kick when re-shown. Map labels toggle the `Map3DElement.mode`
   between `SATELLITE` and `HYBRID`.
 - **Route overview (name + classification + climbs)**: `updateRouteOverview`
-  in `app.js` runs once per route load (GPX import or restoring a saved
+  in `route-load.mjs` runs once per route load (GPX import or restoring a saved
   ride), not on every ride-progress tick — it only depends on the route's
   fixed distance/ascent totals and populates `state.routeName`/`state.climbs`
   for later use. It fills the top-bar GPX chip (`#gpxChip`), the Difficulty
@@ -238,7 +336,7 @@ in place).
   moved `CLIMB_MERGE_GAP_METERS` past that peak — so a short flat stretch or
   a few meters of downhill doesn't end a climb; candidates under
   `CLIMB_MIN_GAIN_METERS` or `CLIMB_MIN_AVERAGE_GRADE_PERCENT` are dropped as
-  noise. All thresholds live in `tuning.mjs`. `updateClimbStatus` (`app.js`,
+  noise. All thresholds live in `tuning.mjs`. `updateClimbStatus` (`climbs-ui.mjs`,
   called from `updateRideUi` on the same slow-UI cadence as the other live
   stats) looks up `state.progressMeters` against `state.climbs` each tick: if
   progress falls inside a climb's `[startDistanceMeters, endDistanceMeters]`
@@ -263,7 +361,7 @@ in place).
   not affect climb detection/status.
 - **First-open auto-load & route deep-link**: with no saved ride and a working
   map, `initGallery` loads the first gallery route automatically
-  (`shouldAutoLoadFirst` in `app.js`); it is skipped when the map/API key
+  (`shouldAutoLoadFirst` in `app.js`'s `startApp`); it is skipped when the map/API key
   is missing so the first-run key prompt stays front and center. Opening the
   app with a `?route=<gallery-id>` query (the landing page's "Launch GPX Rider"
   button uses `app.html?route=0050_jested`) forces that specific gallery route
@@ -281,7 +379,7 @@ in place).
   so elevated segments follow the terrain.
   The rider dot is a `Model3DElement` loading the model at
   `RIDER_DOT_MODEL_PATH` (`tuning.mjs`; see `renderRiderDot`/`updateRiderDot`
-  in `app.js`), **not** a `Polygon3DElement` and **not** a
+  in `route-render.mjs`), **not** a `Polygon3DElement` and **not** a
   `Marker3DElement`/`PinElement` billboard — both were tried first, in that
   order, and both were confirmed by real-browser testing (not just reasoned
   about) to fail:
@@ -311,7 +409,7 @@ in place).
   `RIDER_DOT_ORIENTATION`, `RIDER_DOT_SCALE`, and `RIDER_DOT_ALTITUDE_METERS`
   (`tuning.mjs`) are all independently tunable specifically so a different
   model can be dropped into `app/assets/` and pointed at without touching
-  `app.js` — see the comments on those constants for what to expect when
+  `route-render.mjs` — see the comments on those constants for what to expect when
   swapping models (orientation and unlit materials both being the most
   likely things a new model needs). `RIDER_DOT_ALTITUDE_METERS` puts the dot
   on the ground and is deliberately independent of `ROUTE_LINE_ALTITUDE_METERS`
@@ -330,7 +428,7 @@ in place).
   browsers without `Model3DElement`. The dot (and the minimap marker) mirrors
   the brand "GPX Rider" logo dot — a solid amber center with a paler amber
   ring — via the model's two materials and, for the minimap and fallback
-  ring, the `RIDER_DOT_COLOR` constant in `app.js`. The rider beacon is a
+  ring, the `RIDER_DOT_COLOR` constant in `route-render.mjs`. The rider beacon is a
   real-world-sized extruded `Polygon3DElement` cylinder with
   `drawsOccludedSegments` so trees never hide the rider's position; it is
   **off by default** (`DEFAULT_BEACON_ENABLED`), opt-in from the Rendering
@@ -396,7 +494,7 @@ in place).
   the follow-camera offsets/zoom/angle and, when the rider camera is the active
   surface, flies it back — it never activates or deactivates an overview (an
   active overview is left running). It is **disabled whenever the camera is
-  already at its defaults** (`cameraAtDefaults` in `app.js` — all offsets at
+  already at its defaults** (`cameraAtDefaults` in `camera-ui.mjs` — all offsets at
   default and `cameraMode !== "manual"`, i.e. pressing it would change nothing)
   and enables once a drag captures new offsets or leaves the camera in
   `"manual"`. `syncResetCameraButton` (called from `syncOverviewControls` and
@@ -440,7 +538,7 @@ in place).
   needed to clear the highest route elevation sample under the fitted ellipse by
   `flyHeightMetersAboveTerrainMin`. `maxBankDegrees` scales the bank angle from
   the current turn radius
-  (`minTurnRadiusMeters` = max bank), and app.js applies it to `state.map.roll`.
+  (`minTurnRadiusMeters` = max bank), and `overview-camera.mjs` applies it to `state.map.roll`.
   Fly-over (`createFigureEightFlyover`) reuses the exact same footprint fit,
   `ELLIPSE_FLYBY` config, and camera-frame/pacing driver — only the path differs:
   a Gerono figure-eight (`along = a·cos u`, `cross = b·sin 2u`) that crosses the
@@ -457,7 +555,7 @@ in place).
   `OVERVIEW_DEBUG_LINE_WIDTH`, `OVERVIEW_DEBUG_LINE_ALTITUDE_METERS`, and
   `OVERVIEW_DEBUG_LINE_SAMPLE_COUNT`.
 - **Finish-line orbit.** The instant a ride — pedaled, simulated, or demo —
-  reaches the end of the route (the finish check inside `tick`, `app.js`),
+  reaches the end of the route (the finish check inside `tick`, `movement.mjs`),
   `enterFinishOrbit` takes the camera into an orbit around the rider's exact
   final position, instead of freezing on the follow camera's last frame. It
   reuses the same animated-orbit driver as the overview modes above (same
@@ -478,7 +576,7 @@ in place).
   `tuning.mjs`.
 - **Camera terrain avoidance** lifts the follow camera when its eye would
   sink below terrain + clearance and eases it back down as terrain allows
-  (`currentTerrainLift` in `app.js`; pure math in `camera.mjs`'s
+  (`currentTerrainLift` in `follow-camera.mjs`; pure math in `camera.mjs`'s
   `applyCameraLift`). The terrain estimate is `maxElevationNear` over the
   route's own elevation points — deliberately **not** the Google Elevation
   API, which would cost real money at follow-camera query rates. Keep it
@@ -496,7 +594,7 @@ localStorage transparently. Keys: `gpx-rider:settings`,
 `gpx-rider:last-ride` (route + progress), `gpx-rider:ride-log` (recorded
 samples), `gpx-rider:last-trainer`, `gpx-rider:last-heart-rate`. The one
 deliberate exception is `gpx-rider:maps-api-key`, which stays in
-localStorage (handled directly in `app.js`): saving it reloads the page
+localStorage (handled directly in `map-init.mjs`): saving it reloads the page
 immediately, and only a synchronous write is guaranteed to survive that.
 Never send any of these anywhere; the app's privacy story is "everything
 stays in the browser".
@@ -509,7 +607,7 @@ the Pages origin) is base64-encoded and baked into `app/config.mjs` at
 deploy time by `scripts/inject_maps_api_key.py`, run from `deploy-pages.yml`
 before the Pages artifact is uploaded. The encoding is cosmetic — a webapp's
 key is always visible in the network tab regardless — it just keeps the raw
-key out of the JS source as a greppable literal. `app.js`'s
+key out of the JS source as a greppable literal. `map-init.mjs`'s
 `resolveMapsApiKey()` prefers a key a visitor saved in Settings over this
 default, so self-hosters and forks without the secret get the exact same
 "paste your key" flow as before — `app/config.mjs` just stays empty. When a
