@@ -364,10 +364,11 @@ in place).
   `endUserInteraction` clears `overviewActive`, drops any animated driver, and
   sets `state.cameraMode` to `"manual"` (the overview button goes inactive).
   The overview is **never force-disabled by movement**: the
-  only two automatic transitions are "route loaded → overview on" and "movement
+  automatic transitions are "route loaded → overview on", "movement
   started (pedal or sim) → overview off" (the auto-off lives in
   `ensureMovementLoop`, which flips to `"follow"` and clears `overviewActive` /
-  the animated driver once). Any other time — including mid-ride — the user may
+  the animated driver once), and "ride just finished → finish-line orbit on"
+  (see below). Any other time — including mid-ride — the user may
   toggle the overview on or off; showing it while riding is a deliberate choice
   and does nothing to the ride. A static/satellite overview kept up while riding
   is driven by the movement loop's own `updateMapCamera`→`stepCameraFlight`
@@ -455,6 +456,26 @@ in place).
   by orbit, fly-by and fly-over and tuned by `OVERVIEW_DEBUG_LINE_COLOR`,
   `OVERVIEW_DEBUG_LINE_WIDTH`, `OVERVIEW_DEBUG_LINE_ALTITUDE_METERS`, and
   `OVERVIEW_DEBUG_LINE_SAMPLE_COUNT`.
+- **Finish-line orbit.** The instant a ride — pedaled, simulated, or demo —
+  reaches the end of the route (the finish check inside `tick`, `app.js`),
+  `enterFinishOrbit` takes the camera into an orbit around the rider's exact
+  final position, instead of freezing on the follow camera's last frame. It
+  reuses the same animated-orbit driver as the overview modes above (same
+  intro ease-in from wherever the camera was, same exit on a manual map drag
+  or the overview toggle) but does not go through `computeRouteOverviewCamera`
+  — the "route" at a finish point has no spread to fit a PCA axis to, so it
+  builds the base camera directly (`center` at the finish point plus
+  `FINISH_ORBIT_LOOKAT_HEIGHT_METERS`, `FINISH_ORBIT_TILT_DEGREES`,
+  `FINISH_ORBIT_RANGE_METERS`), with an initial heading sampled the same way
+  the follow camera does (`HEADING_SAMPLE_METERS` back from the finish point).
+  `state.finishOrbitActive` distinguishes it from a normal whole-route orbit so
+  `stepOverviewAnimation` spins it at its own `FINISH_ORBIT_SECONDS_PER_REV` /
+  `FINISH_ORBIT_DIRECTION` instead of the whole-route or climb-focus orbit
+  speeds; any later call into `enterOverviewMode` (a manual overview toggle, a
+  climb/segment focus, resetting the ride, loading a new route) clears the flag
+  and supersedes it, same as grabbing the map does. Toggle via
+  `DEFAULT_FINISH_ORBIT_ENABLED`; all the geometry knobs above live in
+  `tuning.mjs`.
 - **Camera terrain avoidance** lifts the follow camera when its eye would
   sink below terrain + clearance and eases it back down as terrain allows
   (`currentTerrainLift` in `app.js`; pure math in `camera.mjs`'s
