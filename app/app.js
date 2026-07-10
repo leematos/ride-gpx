@@ -38,6 +38,7 @@ import { gradeColoredRouteSegments, styledRouteSegments } from "./route-style.mj
 import { createRideEstimator, estimateRemainingSeconds, recordEstimatorTick } from "./eta.mjs";
 import { classifyRoute } from "./difficulty.mjs";
 import { detectClimbs } from "./climbs.mjs";
+import { advanceDemoRide, createDemoRideModel, seedDemoHistory } from "./demo.mjs";
 import { distanceAtProfileX, drawEmptyProfile, drawProfile, gradeColor, gradeColorZones } from "./profile.mjs";
 import {
   activeCaloriesFromPower,
@@ -83,6 +84,7 @@ import {
   DEFAULT_HUD_FIELD_ORDER,
   DEFAULT_HUD_VISIBLE_COUNT,
   DEFAULT_CAMERA_DEBUG_ENABLED,
+  DEMO_RIDE,
   CAMERA_DEBUG_REFRESH_MS,
   DEFAULT_MAP_FOV_DEGREES,
   DEFAULT_MAP_LABELS_ENABLED,
@@ -153,6 +155,11 @@ import {
   ROUTE_FOCUS_LINE_WIDTH,
   ROUTE_FOCUS_OUTER_COLOR,
   ROUTE_FOCUS_OUTER_WIDTH,
+  RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS,
+  RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS,
+  RECORDING_MAP_VIEWPORT_WIDTH_PIXELS,
+  RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS,
+  RECORDING_WINDOW_RESIZE_VERIFY_MS,
   SCREENSHOT_WIDTH_MAX,
   SCREENSHOT_WIDTH_MIN,
   SIMULATION_SPEED_MAX_KPH,
@@ -168,6 +175,7 @@ import {
   OP_STOP_OR_PAUSE,
   connectTrainer,
   initTrainer,
+  isTrainerConnected,
   queueTrainerGradeSample,
   reconnectSavedTrainer,
   sendTrainerCommand,
@@ -250,6 +258,11 @@ const state = {
   strapHeartRateBpm: null,
   heartRateStatusText: null,
   heartRateRefreshTimer: null,
+  demoModeActive: false,
+  demoModel: null,
+  demoHistorySamples: [],
+  demoTimerSeconds: 0,
+  demoCaloriesKcal: 0,
   gradeUpdateIntervalSeconds: DEFAULT_GRADE_INTERVAL_SECONDS,
   lastSlowUiAt: 0,
   lastRiderDot: null,
@@ -420,6 +433,9 @@ const els = {
   resetRenderingBtn: document.querySelector("#resetRenderingBtn"),
   connectBtn: document.querySelector("#connectBtn"),
   connectHrBtn: document.querySelector("#connectHrBtn"),
+  demoModeBtn: document.querySelector("#demoModeBtn"),
+  resizeRecordingWindowBtn: document.querySelector("#resizeRecordingWindowBtn"),
+  demoBanner: document.querySelector("#demoBanner"),
   restingHeartRateInput: document.querySelector("#restingHeartRateInput"),
   maxHeartRateInput: document.querySelector("#maxHeartRateInput"),
   ftpInput: document.querySelector("#ftpInput"),
@@ -821,6 +837,8 @@ function bindEvents() {
   els.resetRenderingBtn.addEventListener("click", resetRenderingToDefaults);
   els.connectBtn.addEventListener("click", connectTrainer);
   els.connectHrBtn.addEventListener("click", connectHeartRate);
+  els.demoModeBtn.addEventListener("click", toggleDemoMode);
+  els.resizeRecordingWindowBtn.addEventListener("click", resizeWindowForRecording);
   els.startBtn.addEventListener("click", toggleSimulation);
   els.resetBtn.addEventListener("click", resetRide);
   els.downloadFitBtn.addEventListener("click", downloadFitFile);
@@ -909,6 +927,8 @@ function applyGpxText(text, { overrideName = null, fallbackName = null, galleryM
     return;
   }
 
+  stopDemoMode({ silent: true });
+  clearDemoHistory();
   state.route = enrichRoute(route);
   state.routeName = overrideName || gpxName || fallbackName;
   state.galleryMetadata = galleryMetadata && typeof galleryMetadata === "object"
@@ -935,6 +955,7 @@ function applyGpxText(text, { overrideName = null, fallbackName = null, galleryM
 
   els.startBtn.disabled = false;
   els.resetBtn.disabled = false;
+  syncDemoModeUi();
 }
 
 // Route name (top-bar GPX chip), classification (difficulty stat tile) and
@@ -1161,7 +1182,7 @@ function updateClimbStatus(point) {
 // Top-left chip ride stats. The local wall clock has its own timer below so
 // seconds keep advancing while the rider is stationary.
 function updateFullscreenClock(riddenText, ascentText = "--") {
-  els.fsClockElapsed.textContent = formatDuration(rideLogSummary().timerSeconds, state.durationFormat);
+  els.fsClockElapsed.textContent = formatDuration(currentRideTimerSeconds(), state.durationFormat);
   els.fsClockDistance.textContent = riddenText;
   els.fsClockAscent.textContent = ascentText;
 }
@@ -1179,6 +1200,8 @@ function startFullscreenClock() {
 function updateTrainingMeters(grade) {
   const power = state.trainerPowerWatts;
   const heartRate = currentHeartRate();
+  const ftpWatts = effectiveFtpWatts();
+  const maxHeartRateBpm = effectiveMaxHeartRateBpm();
   const gradeValue = Number.isFinite(grade) ? grade : null;
   const showPowerMeter = Number.isFinite(power);
   const showHeartRateMeter = Number.isFinite(heartRate);
@@ -1191,8 +1214,8 @@ function updateTrainingMeters(grade) {
 
   const powerZones = currentPowerZones();
   const heartRateZones = currentHeartRateZones();
-  const powerScale = zoneDisplayBounds(powerZones, 0, state.ftpWatts ? state.ftpWatts * 1.6 : 500);
-  const heartRateScale = zoneDisplayBounds(heartRateZones, 0, state.maxHeartRateBpm);
+  const powerScale = zoneDisplayBounds(powerZones, 0, ftpWatts ? ftpWatts * 1.6 : 500);
+  const heartRateScale = zoneDisplayBounds(heartRateZones, 0, maxHeartRateBpm);
 
   updateZoneMeter({
     meter: els.powerMeter,
@@ -1205,7 +1228,7 @@ function updateTrainingMeters(grade) {
     zones: powerZones,
     definitions: POWER_ZONE_DEFINITIONS,
     text: Number.isFinite(power) ? `${Math.round(power)} W` : "--",
-    fallbackMeta: state.ftpWatts ? `FTP ${state.ftpWatts} W` : "Zones not set",
+    fallbackMeta: ftpWatts ? `FTP ${ftpWatts} W` : "Zones not set",
   });
 
   updateZoneMeter({
@@ -1219,7 +1242,7 @@ function updateTrainingMeters(grade) {
     zones: heartRateZones,
     definitions: HEART_RATE_ZONE_DEFINITIONS,
     text: Number.isFinite(heartRate) ? `${Math.round(heartRate)} bpm` : "--",
-    fallbackMeta: `Max ${state.maxHeartRateBpm} bpm`,
+    fallbackMeta: `Max ${maxHeartRateBpm} bpm`,
   });
 
   const gradeZones = gradeMeterZones();
@@ -1240,11 +1263,24 @@ function updateTrainingMeters(grade) {
 }
 
 function currentHeartRateZones() {
-  return calculateHeartRateZones(state.maxHeartRateBpm, state.restingHeartRateBpm);
+  return calculateHeartRateZones(effectiveMaxHeartRateBpm(), effectiveRestingHeartRateBpm());
 }
 
 function currentPowerZones() {
-  return state.ftpWatts ? calculatePowerZones(state.ftpWatts) : null;
+  const ftpWatts = effectiveFtpWatts();
+  return ftpWatts ? calculatePowerZones(ftpWatts) : null;
+}
+
+function effectiveFtpWatts() {
+  return state.demoModeActive ? DEMO_RIDE.ftpWatts : state.ftpWatts;
+}
+
+function effectiveMaxHeartRateBpm() {
+  return state.demoModeActive ? DEMO_RIDE.maxHeartRateBpm : state.maxHeartRateBpm;
+}
+
+function effectiveRestingHeartRateBpm() {
+  return state.demoModeActive ? DEMO_RIDE.restingHeartRateBpm : state.restingHeartRateBpm;
 }
 
 function calculateHeartRateZones(maxHr, restingHr = DEFAULT_RESTING_HEART_RATE_BPM) {
@@ -1421,12 +1457,14 @@ function buildClimbMiniBars(climb) {
 function updateFullscreenClimbBanner(point) {
   if (state.selectedProfileSegment && isMoving()) {
     showSegmentBanner(state.selectedProfileSegment);
+    syncDemoBannerPosition();
     return;
   }
   els.segmentBanner.hidden = true;
 
   if (!state.climbs.length) {
     els.climbBanner.hidden = true;
+    syncDemoBannerPosition();
     return;
   }
 
@@ -1437,6 +1475,7 @@ function updateFullscreenClimbBanner(point) {
   );
   if (currentIndex !== -1) {
     showOnClimbBanner(state.climbs[currentIndex], point, `Climb ${currentIndex + 1} of ${total}`);
+    syncDemoBannerPosition();
     return;
   }
 
@@ -1444,10 +1483,12 @@ function updateFullscreenClimbBanner(point) {
   const next = nextIndex === -1 ? null : state.climbs[nextIndex];
   if (next && next.startDistanceMeters - progress <= CLIMB_BANNER_APPROACH_METERS) {
     showAheadClimbBanner(next, next.startDistanceMeters - progress, `Climb ${nextIndex + 1} of ${total}`);
+    syncDemoBannerPosition();
     return;
   }
 
   els.climbBanner.hidden = true;
+  syncDemoBannerPosition();
 }
 
 function showAheadClimbBanner(climb, distanceToClimb, orderLabel) {
@@ -1794,6 +1835,205 @@ function updateStartButton() {
   els.startBtn.classList.toggle("sim-running", state.simulating);
 }
 
+function toggleDemoMode() {
+  if (state.demoModeActive) {
+    stopDemoMode({ message: "Demo mode off." });
+    return;
+  }
+  startDemoMode();
+}
+
+function startDemoMode() {
+  if (state.route.length < 2) {
+    updateProgressLabel("Load a route before starting Demo mode.");
+    return;
+  }
+  if (isTrainerConnected() || isHeartRateConnected()) {
+    updateProgressLabel("Demo mode is only available when real trainer and HR devices are disconnected.");
+    syncDemoModeUi();
+    return;
+  }
+
+  state.demoModeActive = true;
+  state.demoModel = createDemoRideModel(DEMO_RIDE);
+  seedDemoHistory(state.demoModel, {
+    route: state.route,
+    progressMeters: state.progressMeters,
+  });
+  state.demoHistorySamples = state.demoModel.historySamples;
+  state.demoTimerSeconds = state.demoModel.elapsedSeconds;
+  state.demoCaloriesKcal = state.demoModel.caloriesKcal;
+  state.simulating = false;
+  updateStartButton();
+  advanceDemoTelemetry(0, gradeAt(state.route, state.progressMeters), 0, { recordHistory: false });
+  updateProgressLabel("Demo mode on — synthetic trainer and HR are driving the ride.");
+  syncDemoModeUi();
+  ensureMovementLoop();
+}
+
+function stopDemoMode({ message = null, silent = false, preserveHistory = false } = {}) {
+  if (!state.demoModeActive) return;
+  if (preserveHistory && state.demoModel) {
+    state.demoHistorySamples = state.demoModel.historySamples;
+    state.demoTimerSeconds = state.demoModel.elapsedSeconds;
+    state.demoCaloriesKcal = state.demoModel.caloriesKcal;
+  } else {
+    clearDemoHistory();
+  }
+  state.demoModeActive = false;
+  state.demoModel = null;
+  state.trainerSpeedKph = null;
+  state.trainerPowerWatts = null;
+  state.trainerCaloriesKcal = null;
+  state.trainerHeartRateBpm = null;
+  state.strapHeartRateBpm = null;
+  els.trainerStat.textContent = "Idle";
+  els.hrConnectionStat.textContent = state.heartRateStatusText || "Not connected";
+  setPedaling(false);
+  syncDemoModeUi();
+  updateTelemetryUi();
+  updateTrainingMeters(state.route.length ? gradeAt(state.route, state.progressMeters) : NaN);
+  updateRideUi({ force: true });
+  if (!silent && message) updateProgressLabel(message);
+}
+
+function clearDemoHistory() {
+  state.demoHistorySamples = [];
+  state.demoTimerSeconds = 0;
+  state.demoCaloriesKcal = 0;
+}
+
+function advanceDemoTelemetry(elapsedSeconds, grade, metersAdvanced, { recordHistory = true } = {}) {
+  if (!state.demoModeActive || !state.demoModel) return null;
+  const point = state.route.length
+    ? interpolateRoutePoint(state.route, state.progressMeters)
+    : null;
+  const caloriesFromPower = activeCaloriesFromPower(
+    state.demoModel.powerWatts,
+    elapsedSeconds,
+    CYCLING_GROSS_EFFICIENCY,
+  );
+  const telemetry = advanceDemoRide(state.demoModel, {
+    elapsedSeconds,
+    gradePercent: grade,
+    point,
+    routeProgressMeters: state.progressMeters,
+    metersAdvanced,
+    caloriesFromPower,
+    recordHistory,
+  });
+  state.trainerSpeedKph = telemetry.speedKph;
+  state.trainerPowerWatts = telemetry.powerWatts;
+  state.trainerCaloriesKcal = telemetry.caloriesKcal;
+  state.trainerHeartRateBpm = telemetry.heartRateBpm;
+  state.strapHeartRateBpm = telemetry.heartRateBpm;
+  state.demoHistorySamples = state.demoModel.historySamples;
+  state.demoTimerSeconds = state.demoModel.elapsedSeconds;
+  state.demoCaloriesKcal = state.demoModel.caloriesKcal;
+  updatePedalingFromSpeed();
+  updateTelemetryUi();
+  return telemetry;
+}
+
+function syncDemoModeUi() {
+  const hasRoute = state.route.length > 1;
+  const blockedByRealDevice = !state.demoModeActive && (isTrainerConnected() || isHeartRateConnected());
+  els.demoModeBtn.disabled = !hasRoute || blockedByRealDevice;
+  els.demoModeBtn.setAttribute("aria-pressed", String(state.demoModeActive));
+  els.demoModeBtn.textContent = state.demoModeActive ? "Stop demo" : "Demo mode";
+  els.connectBtn.disabled = state.demoModeActive;
+  els.connectHrBtn.disabled = state.demoModeActive;
+  els.demoBanner.hidden = !(state.demoModeActive && state.pedaling);
+  syncDemoBannerPosition();
+}
+
+function syncDemoBannerPosition() {
+  if (els.demoBanner.hidden) {
+    els.demoBanner.style.top = "";
+    return;
+  }
+
+  if (els.climbBanner.hidden) {
+    els.demoBanner.style.top = "";
+    return;
+  }
+
+  const gap = Number.parseFloat(getComputedStyle(els.mapViewport).getPropertyValue("--fs-dock-gap")) || 10;
+  els.demoBanner.style.top = `${els.climbBanner.offsetTop + els.climbBanner.offsetHeight + gap}px`;
+}
+
+async function resizeWindowForRecording() {
+  if (document.fullscreenElement) {
+    updateProgressLabel("Exit fullscreen before resizing the recording window.");
+    return;
+  }
+
+  if (typeof window.resizeBy !== "function") {
+    updateProgressLabel("This browser does not expose window resizing.");
+    return;
+  }
+
+  let outerWindowChanged = false;
+  for (let attempt = 0; attempt < RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS; attempt += 1) {
+    const size = currentMapViewportPixelSize();
+    const deltaWidth = RECORDING_MAP_VIEWPORT_WIDTH_PIXELS - size.width;
+    const deltaHeight = RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS - size.height;
+    if (recordingMapViewportIsSized(size)) {
+      reportRecordingWindowResize(size);
+      return;
+    }
+
+    const outerWidthBefore = window.outerWidth;
+    const outerHeightBefore = window.outerHeight;
+    try {
+      window.resizeBy(deltaWidth, deltaHeight);
+    } catch {
+      updateProgressLabel("Browser blocked window resizing.");
+      return;
+    }
+    await wait(RECORDING_WINDOW_RESIZE_VERIFY_MS);
+    outerWindowChanged ||= window.outerWidth !== outerWidthBefore || window.outerHeight !== outerHeightBefore;
+  }
+
+  reportRecordingWindowResize(currentMapViewportPixelSize(), { blocked: !outerWindowChanged });
+}
+
+function currentMapViewportPixelSize() {
+  const rect = els.mapViewport.getBoundingClientRect();
+  return {
+    width: Math.round(rect.width),
+    height: Math.round(rect.height),
+  };
+}
+
+function recordingMapViewportIsSized(size) {
+  return Math.abs(size.width - RECORDING_MAP_VIEWPORT_WIDTH_PIXELS) <= RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS
+    && Math.abs(size.height - RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS) <= RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS;
+}
+
+function reportRecordingWindowResize(size, { blocked = false } = {}) {
+  if (state.route.length) {
+    renderProfile();
+  }
+  if (recordingMapViewportIsSized(size)) {
+    updateProgressLabel(
+      `Map view set to ${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}x${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS} px.`,
+    );
+    return;
+  }
+
+  const current = `${size.width}x${size.height} px`;
+  if (blocked) {
+    updateProgressLabel(`Browser blocked window resizing; map view is ${current}.`);
+  } else {
+    updateProgressLabel(`Map view is ${current}; screen limits may be in the way.`);
+  }
+}
+
+function wait(milliseconds) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
 function updatePedalingFromSpeed() {
   const speed = state.trainerSpeedKph;
   if (!Number.isFinite(speed)) {
@@ -1818,6 +2058,7 @@ function setPedaling(pedaling) {
   } else if (!state.simulating) {
     handleMovementStopped();
   }
+  syncDemoModeUi();
 }
 
 function ensureMovementLoop() {
@@ -1911,6 +2152,8 @@ function tick(now) {
 
   const elapsedSeconds = clamp((now - state.lastTick) / 1000, 0, MAX_TICK_SECONDS);
   state.lastTick = now;
+  const currentGrade = gradeAt(state.route, state.progressMeters);
+  if (state.demoModeActive) advanceDemoTelemetry(elapsedSeconds, currentGrade, 0, { recordHistory: false });
   const speedKph = state.pedaling && Number.isFinite(state.trainerSpeedKph)
     ? state.trainerSpeedKph
     : Number(els.speedInput.value);
@@ -1918,7 +2161,11 @@ function tick(now) {
   const totalDistance = routeTotalDistance(state.route);
 
   const previousProgress = state.progressMeters;
-  state.progressMeters = Math.min(totalDistance, state.progressMeters + metersPerSecond * elapsedSeconds);
+  const metersAdvanced = metersPerSecond * elapsedSeconds;
+  state.progressMeters = Math.min(totalDistance, state.progressMeters + metersAdvanced);
+  if (state.demoModeActive) {
+    advanceDemoTelemetry(0, gradeAt(state.route, state.progressMeters), state.progressMeters - previousProgress);
+  }
 
   // Feed the ETA pace history only from real pedaling — simulated movement
   // rides at an artificial constant speed and would poison the estimate.
@@ -1931,7 +2178,7 @@ function tick(now) {
     });
   }
 
-  if (state.pedaling && Number.isFinite(state.trainerPowerWatts) && elapsedSeconds > 0) {
+  if (state.pedaling && !state.demoModeActive && Number.isFinite(state.trainerPowerWatts) && elapsedSeconds > 0) {
     state.powerCaloriesKcal += activeCaloriesFromPower(
       state.trainerPowerWatts,
       elapsedSeconds,
@@ -1939,7 +2186,7 @@ function tick(now) {
     );
   }
 
-  if (state.pedaling) {
+  if (state.pedaling && !state.demoModeActive) {
     recordRideTick({
       elapsedSeconds,
       metersAdvanced: state.progressMeters - previousProgress,
@@ -1957,6 +2204,12 @@ function tick(now) {
 
   if (state.progressMeters >= totalDistance) {
     state.simulating = false;
+    if (state.demoModeActive) {
+      stopDemoMode({
+        message: "Demo mode finished at the end of the route.",
+        preserveHistory: true,
+      });
+    }
     state.movementLoopActive = false;
     ensureCameraFlightLoop();
     updateStartButton();
@@ -2003,7 +2256,7 @@ function updateRideUi(options = {}) {
   const etaSeconds = currentEtaSeconds(totalDistance, totalAscent, totalDescent);
   const etaText = etaSeconds === null ? "--" : formatDuration(etaSeconds, state.durationFormat);
   const ascentText = formatAltitude(ascentSoFar, state.distanceUnits);
-  const elapsedText = formatDuration(rideLogSummary().timerSeconds, state.durationFormat);
+  const elapsedText = formatDuration(currentRideTimerSeconds(), state.durationFormat);
   const caloriesText = formatEnergy(currentCaloriesKcal() ?? NaN, state.energyUnits);
 
   els.distanceStat.textContent = formatDistance(totalDistance, state.distanceUnits, 1);
@@ -2053,10 +2306,12 @@ function updateRideUi(options = {}) {
   updateTrainingMeters(grade);
 
   updateRecordingUi();
-  queueTrainerGradeSample(grade, {
-    force: options.force,
-    intervalSeconds: state.gradeUpdateIntervalSeconds,
-  });
+  if (!state.demoModeActive) {
+    queueTrainerGradeSample(grade, {
+      force: options.force,
+      intervalSeconds: state.gradeUpdateIntervalSeconds,
+    });
+  }
 }
 
 // Second progress bar under the distance one: how much of the route's total
@@ -2115,9 +2370,19 @@ function renderProfile(progress = currentRideProgress()) {
     selectionStats: state.selectedProfileSegment,
     dark: true,
     distanceUnits: state.distanceUnits,
-    historySamples: rideLogSamples().slice(-PROFILE_HISTORY_SAMPLE_LIMIT),
+    historySamples: currentProfileHistorySamples(),
     visibleSeries: state.profileSeries,
   });
+}
+
+function currentProfileHistorySamples() {
+  if (state.demoModeActive && state.demoModel) {
+    return state.demoModel.historySamples;
+  }
+  if (state.demoHistorySamples.length) {
+    return state.demoHistorySamples;
+  }
+  return rideLogSamples().slice(-PROFILE_HISTORY_SAMPLE_LIMIT);
 }
 
 function handleProfileHover(event) {
@@ -2212,6 +2477,9 @@ function currentRideProgress() {
 // --- Telemetry ---------------------------------------------------------------
 
 function handleTrainerTelemetry(telemetry) {
+  if (telemetry && state.demoModeActive) {
+    stopDemoMode({ message: "Demo mode turned off because a real trainer connected." });
+  }
   // Live telemetry is the one dependable "actually connected" signal.
   els.trainerDot.classList.toggle("connected", Boolean(telemetry));
 
@@ -2236,23 +2504,41 @@ function handleTrainerTelemetry(telemetry) {
 }
 
 function handleTrainerStatus(text, { onlyClearError = false } = {}) {
+  if (state.demoModeActive) {
+    if (isTrainerConnected()) {
+      stopDemoMode({ message: "Demo mode turned off because a real trainer connected." });
+    } else {
+      return;
+    }
+  }
   if (onlyClearError && els.trainerStat.textContent !== "BLE error") return;
   els.trainerStat.textContent = text;
 }
 
 function handleStrapHeartRate(bpm) {
+  if (state.demoModeActive && Number.isFinite(bpm)) {
+    stopDemoMode({ message: "Demo mode turned off because a real heart-rate strap connected." });
+  }
   state.strapHeartRateBpm = Number.isFinite(bpm) ? bpm : null;
   refreshHeartRateUi();
   syncHeartRateRefreshLoop();
 }
 
 function handleHeartRateStatus(text) {
+  if (state.demoModeActive) {
+    if (isHeartRateConnected()) {
+      stopDemoMode({ message: "Demo mode turned off because a real heart-rate strap connected." });
+    } else {
+      return;
+    }
+  }
   state.heartRateStatusText = text;
   refreshHeartRateUi();
   syncHeartRateRefreshLoop();
 }
 
 function currentHeartRate() {
+  if (state.demoModeActive) return state.strapHeartRateBpm ?? state.trainerHeartRateBpm ?? null;
   // A connected strap is the HR source of truth. Only fall back to a
   // trainer-relayed HR field when no dedicated strap is connected.
   if (isHeartRateConnected()) return state.strapHeartRateBpm;
@@ -2265,6 +2551,10 @@ function refreshHeartRateUi() {
 }
 
 function syncHeartRateRefreshLoop() {
+  if (state.demoModeActive) {
+    stopHeartRateRefreshLoop();
+    return;
+  }
   if (isHeartRateConnected()) {
     startHeartRateRefreshLoop();
   } else {
@@ -2292,10 +2582,26 @@ function stopHeartRateRefreshLoop() {
 }
 
 function currentCaloriesKcal() {
+  if (state.demoModeActive && state.demoModel) {
+    return state.demoModel.caloriesKcal;
+  }
+  if (state.demoHistorySamples.length && state.demoCaloriesKcal > 0) {
+    return state.demoCaloriesKcal;
+  }
   if (state.powerCaloriesKcal > 0 || Number.isFinite(state.trainerPowerWatts)) {
     return state.powerCaloriesKcal;
   }
   return Number.isFinite(state.trainerCaloriesKcal) ? state.trainerCaloriesKcal : null;
+}
+
+function currentRideTimerSeconds() {
+  if (state.demoModeActive && state.demoModel) {
+    return state.demoModel.elapsedSeconds;
+  }
+  if (state.demoHistorySamples.length && state.demoTimerSeconds > 0) {
+    return state.demoTimerSeconds;
+  }
+  return rideLogSummary().timerSeconds;
 }
 
 function updateTelemetryUi() {
@@ -2304,19 +2610,26 @@ function updateTelemetryUi() {
   const heartRate = currentHeartRate();
   const heartRateText = Number.isFinite(heartRate) ? `${heartRate} bpm` : "--";
   const caloriesText = formatEnergy(currentCaloriesKcal() ?? NaN, state.energyUnits);
+  const trainerConnected = state.demoModeActive || Boolean(state.trainerSpeedKph !== null || state.trainerPowerWatts !== null);
+  const heartRateConnected = state.demoModeActive || isHeartRateConnected();
 
   els.powerStat.textContent = powerText;
   els.speedStat.textContent = speedText;
   els.heartRateStat.textContent = heartRateText;
-  els.hrConnectionStat.textContent = isHeartRateConnected() && Number.isFinite(state.strapHeartRateBpm)
+  els.trainerStat.textContent = state.demoModeActive ? "Demo trainer" : els.trainerStat.textContent;
+  els.trainerDot.classList.toggle("connected", trainerConnected);
+  els.hrConnectionStat.textContent = state.demoModeActive
+    ? `${heartRateText} demo`
+    : isHeartRateConnected() && Number.isFinite(state.strapHeartRateBpm)
     ? `${state.strapHeartRateBpm} bpm`
     : (state.heartRateStatusText || (isHeartRateConnected() ? "Connected" : "Not connected"));
-  els.hrDot.classList.toggle("connected", isHeartRateConnected());
+  els.hrDot.classList.toggle("connected", heartRateConnected);
   els.caloriesStat.textContent = caloriesText;
   els.hudPowerStat.textContent = powerText;
   els.hudSpeedStat.textContent = speedText;
   els.hudHeartRateStat.textContent = heartRateText;
   els.hudCaloriesStat.textContent = caloriesText;
+  syncDemoModeUi();
 }
 
 // --- Ride recording & FIT export ----------------------------------------------
@@ -2324,7 +2637,7 @@ function updateTelemetryUi() {
 function updateRecordingUi() {
   // The bucket only grows while the rider is actually moving — mirror that
   // with the pulsing RECORDING indicator on the FIT buffer card.
-  els.recIndicator.hidden = !state.pedaling;
+  els.recIndicator.hidden = !state.pedaling || state.demoModeActive;
 
   const summary = rideLogSummary();
   els.recDistanceStat.textContent = formatDistance(summary.distanceMeters, state.distanceUnits);
@@ -4729,6 +5042,7 @@ function restoreSavedRide() {
   updateRideUi({ force: true });
   els.startBtn.disabled = false;
   els.resetBtn.disabled = false;
+  syncDemoModeUi();
 }
 
 function saveRideThrottled() {

@@ -444,6 +444,15 @@ export const DEFAULT_SCREENSHOT_WIDTH = 1920;
 export const SCREENSHOT_WIDTH_MIN = 640;
 export const SCREENSHOT_WIDTH_MAX = 3840;
 
+// One-click recording preset: resize the browser window so the actual map
+// viewport measures exactly this size in CSS pixels. This targets screen
+// capture consistency, not exported JPG dimensions.
+export const RECORDING_MAP_VIEWPORT_WIDTH_PIXELS = 1280;
+export const RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS = 720;
+export const RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS = 1;
+export const RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS = 3;
+export const RECORDING_WINDOW_RESIZE_VERIFY_MS = 180;
+
 // --- Display & HUD defaults ------------------------------------------------------------
 
 // Satellite minimap overlay above the fullscreen data dock.
@@ -658,6 +667,55 @@ export const CLIMB_MIN_GAIN_METERS = 20;
  * Prevents extremely long, nearly flat false-drags from being classified as categorizable climbs.
  */
 export const CLIMB_MIN_AVERAGE_GRADE_PERCENT = 1.5;
+
+// --- Demo mode -----------------------------------------------------------------
+
+// Synthetic trainer + heart-rate strap profile used for screen recordings.
+// It is deliberately separate from user settings: enabling Demo mode never
+// overwrites the rider's stored HR/FTP values or connects to BLE devices.
+export const DEMO_RIDE = {
+  // Fixed showcase rider values. FTP and max HR drive the training meters;
+  // weight drives the grade-to-speed physics model.
+  riderWeightKg: 100,
+  bikeWeightKg: 9,
+  ftpWatts: 270,
+  maxHeartRateBpm: 180,
+  restingHeartRateBpm: 86,
+  thresholdHeartRateBpm: 155,
+  // Upper bound for generated demo history. When starting Demo mode from the
+  // middle or end of a route, the synthetic past is thinned to this many
+  // samples so the whole route is painted without making profile redraws heavy.
+  maxHistorySamples: 3600,
+
+  // Target power model: flats sit below threshold, climbs add work, descents
+  // back off. Smoothing keeps power from jumping at every GPX grade wiggle.
+  flatPowerWatts: 205,
+  climbWattsPerGradePercent: 13.5,
+  descentWattsPerGradePercent: 24,
+  minPowerWatts: 85,
+  maxPowerWatts: 360,
+  powerSmoothingTauSeconds: 7,
+
+  // Cycling physics inputs for solving speed from power and road grade.
+  // CdA is intentionally upright/hoods-ish so the demo feels like a rider,
+  // not a velodrome time trial.
+  rollingResistanceCoefficient: 0.005,
+  dragAreaSquareMeters: 0.48,
+  airDensityKgPerCubicMeter: 1.225,
+  drivetrainEfficiency: 0.96,
+  minSpeedKph: 5,
+  maxSpeedKph: 72,
+  speedSmoothingTauSeconds: 5,
+
+  // HR follows effort slowly. It rises after sustained power, waits before
+  // dropping, and after two low-effort minutes eases back toward resting HR.
+  heartRateUpdateIntervalSeconds: 1,
+  heartRateRiseTauSeconds: 30,
+  heartRateFallDelaySeconds: 16,
+  heartRateFallTauSeconds: 78,
+  lowEffortReturnDelaySeconds: 120,
+  heartRateNoiseBpm: 1,
+};
 
 // --- Ride recording -----------------------------------------------------------------
 

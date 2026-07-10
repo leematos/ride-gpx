@@ -1776,6 +1776,67 @@ progress.ascent-progress::-moz-progress-bar {
   white-space: nowrap;
 }
 
+.demo-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.demo-card-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.demo-card-actions .btn {
+  white-space: nowrap;
+}
+
+.demo-card .btn[aria-pressed="true"] {
+  color: #1b1205;
+  border-color: rgba(246, 165, 44, 0.9);
+  background: var(--accent);
+}
+
+.demo-banner {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  z-index: 7;
+  transform: translateX(-50%);
+  max-width: calc(100% - 32px);
+  padding: 8px 12px;
+  border: 1px solid rgba(246, 165, 44, 0.45);
+  border-radius: 999px;
+  color: #ffe4b6;
+  background: rgba(18, 16, 12, 0.78);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.32);
+  font: 700 10px/1 var(--font-ui);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-align: center;
+  white-space: normal;
+  pointer-events: none;
+  animation: demoBannerPulse 1.55s ease-in-out infinite;
+}
+
+.demo-banner[hidden] {
+  display: none;
+}
+
+@keyframes demoBannerPulse {
+  0%,
+  100% {
+    opacity: 0.76;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
 /* ---- FIT buffer ----------------------------------------------------------------- */
 
 .recording-indicator {
@@ -2749,6 +2810,10 @@ input[type="color"] {
     left: 14px;
     gap: 8px;
     padding: 8px 12px;
+  }
+
+  .demo-banner {
+    top: 14px;
   }
 
   .fs-clock-time,
