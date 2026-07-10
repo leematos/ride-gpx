@@ -193,6 +193,24 @@ export const DEFAULT_CLIMB_ORBIT_SECONDS_PER_REV = 30;
 export const CLIMB_ORBIT_SECONDS_PER_REV_MIN = 10;
 export const CLIMB_ORBIT_SECONDS_PER_REV_MAX = 90;
 
+// --- Finish-line orbit -------------------------------------------------------------
+//
+// The instant a ride (pedaled, simulated, or demo) reaches the end of the
+// route, the camera leaves the rider and orbits the finish point instead of
+// freezing on the follow camera's last frame. It reuses the same animated
+// orbit driver as the modes above (same intro ease-in, same
+// manual-drag/toggle exit) but is centered directly on the finish point
+// rather than a route-shape fit, since "the route" at the finish line is a
+// single point with nothing to frame.
+export const DEFAULT_FINISH_ORBIT_ENABLED = true;
+export const FINISH_ORBIT_RANGE_METERS = 1200;
+export const FINISH_ORBIT_TILT_DEGREES = 75;
+export const FINISH_ORBIT_SECONDS_PER_REV = 60;
+export const FINISH_ORBIT_DIRECTION = 1;
+// Height (meters) above the finish point's ground elevation the camera looks
+// at, so the orbit centers roughly on rider-eye height instead of bare ground.
+export const FINISH_ORBIT_LOOKAT_HEIGHT_METERS = 10;
+
 // Horizontal pointer movement before a profile interaction becomes a segment
 // selection instead of a normal click-to-seek.
 export const PROFILE_SEGMENT_SELECTION_DRAG_PIXELS = 8;
@@ -444,14 +462,25 @@ export const DEFAULT_SCREENSHOT_WIDTH = 1920;
 export const SCREENSHOT_WIDTH_MIN = 640;
 export const SCREENSHOT_WIDTH_MAX = 3840;
 
-// One-click recording preset: resize the browser window so the actual map
-// viewport measures exactly this size in CSS pixels. This targets screen
-// capture consistency, not exported JPG dimensions.
+// One-click recording preset: a CSS-pinned "theater mode" that fixes the map
+// viewport to exactly this size (dimming the rest of the app behind it) so
+// screen captures come out at a consistent size. Not exported JPG dimensions,
+// and not an actual browser-window resize — most browsers block scripted
+// resizing of a window/tab they didn't open themselves via window.open().
 export const RECORDING_MAP_VIEWPORT_WIDTH_PIXELS = 1280;
 export const RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS = 720;
 export const RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS = 1;
-export const RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS = 3;
-export const RECORDING_WINDOW_RESIZE_VERIFY_MS = 180;
+
+// Optional checkboxes (Demo mode panel) that hide specific HUD overlays while
+// theater mode is active, so a screen recording can be a clean, showcase-ready
+// shot of just the map, route and rider — no data tiles, banners or buttons.
+export const DEFAULT_THEATER_HIDE_CLOCK = false;
+export const DEFAULT_THEATER_HIDE_METERS = false;
+export const DEFAULT_THEATER_HIDE_DOCK = false;
+export const DEFAULT_THEATER_HIDE_CLIMB_BANNER = false;
+export const DEFAULT_THEATER_HIDE_DEMO_CHIP = false;
+export const DEFAULT_THEATER_HIDE_CONTROLS = false;
+export const DEFAULT_THEATER_HIDE_MINIMAP = false;
 
 // --- Display & HUD defaults ------------------------------------------------------------
 

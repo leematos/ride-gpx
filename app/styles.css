@@ -292,6 +292,60 @@ body {
   background: #000;
 }
 
+/* "Theater mode": pins the map viewport to an exact 1280x720 CSS-pixel box,
+   centered over a dimmed backdrop (the huge box-shadow spread), so a screen
+   recording captures a consistent size without needing the browser window
+   itself resized (most browsers block scripted resizing of a window/tab
+   they didn't open via window.open()). Shrinks via max-width/height if the
+   browser window itself is smaller than 1280x720. */
+.map-viewport.theater-mode {
+  position: fixed;
+  inset: 0;
+  z-index: 45;
+  width: 1280px;
+  height: 720px;
+  max-width: 100vw;
+  max-height: 100vh;
+  margin: auto;
+  background: #0b0d10;
+  box-shadow: 0 0 0 100vmax rgba(4, 6, 9, 0.86);
+}
+
+/* Optional per-overlay hiding while in theater mode (Demo mode panel
+   checkboxes), for a clean showcase recording. The classes are set
+   independent of theater mode itself, so these rules only bite once
+   .theater-mode is also present. */
+.map-viewport.theater-mode.theater-hide-clock #fullscreenClock {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-meters #fullscreenTrainingMeters {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-dock #fullscreenOverlayBottom {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-climb-banner #climbBanner {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-demo-chip #demoBanner {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-controls .map-actions,
+.map-viewport.theater-mode.theater-hide-controls #resetCameraControl,
+.map-viewport.theater-mode.theater-hide-controls #mapOverviewControl,
+.map-viewport.theater-mode.theater-hide-controls #climbOverviewControl {
+  display: none;
+}
+
+.map-viewport.theater-mode.theater-hide-minimap #minimap {
+  display: none;
+}
+
 #map {
   position: absolute;
   inset: 0;
@@ -1778,6 +1832,12 @@ progress.ascent-progress::-moz-progress-bar {
 
 .demo-card {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.demo-card-top {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 14px;
@@ -1789,6 +1849,40 @@ progress.ascent-progress::-moz-progress-bar {
   justify-content: flex-end;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.theater-hud-toggles {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.theater-hud-toggles-label {
+  font: 500 11px/1 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--faint);
+  flex: 1 0 100%;
+}
+
+.theater-hud-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.theater-hud-toggle input {
+  accent-color: var(--accent);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
 }
 
 .demo-card-actions .btn {

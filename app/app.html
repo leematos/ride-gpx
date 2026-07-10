@@ -499,13 +499,46 @@
           </div>
 
           <div class="panel-card demo-card">
-            <div>
-              <span class="panel-card-title">Demo mode</span>
-              <p class="panel-card-hint">Synthetic trainer and HR for recording the app</p>
+            <div class="demo-card-top">
+              <div>
+                <span class="panel-card-title">Demo mode</span>
+                <p class="panel-card-hint">Synthetic trainer and HR for recording the app</p>
+              </div>
+              <div class="demo-card-actions">
+                <button id="resizeRecordingWindowBtn" type="button" class="btn btn-ghost" title="Frame the map at exactly 1280x720 px for recording" aria-pressed="false">1280x720 map</button>
+                <button id="demoModeBtn" type="button" class="btn btn-outline-blue" aria-pressed="false" disabled>Demo mode</button>
+              </div>
             </div>
-            <div class="demo-card-actions">
-              <button id="resizeRecordingWindowBtn" type="button" class="btn btn-ghost" title="Resize window so the map view is 1280x720 px">1280x720 map</button>
-              <button id="demoModeBtn" type="button" class="btn btn-outline-blue" aria-pressed="false" disabled>Demo mode</button>
+            <div class="theater-hud-toggles">
+              <span class="theater-hud-toggles-label">Hide in 1280x720 view</span>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideClockInput" type="checkbox">
+                <span>Top-left chip</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideMetersInput" type="checkbox">
+                <span>Meters</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideDockInput" type="checkbox">
+                <span>Bottom panel</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideClimbBannerInput" type="checkbox">
+                <span>Climb banner</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideDemoChipInput" type="checkbox">
+                <span>Demo mode chip</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideControlsInput" type="checkbox">
+                <span>Controls</span>
+              </label>
+              <label class="theater-hud-toggle">
+                <input id="theaterHideMinimapInput" type="checkbox">
+                <span>Minimap</span>
+              </label>
             </div>
           </div>
         </aside>

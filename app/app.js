@@ -120,6 +120,12 @@ import {
   OVERVIEW_ORBIT_SECONDS_PER_REV,
   OVERVIEW_ORBIT_DIRECTION,
   OVERVIEW_ANIM_INTRO_SECONDS,
+  DEFAULT_FINISH_ORBIT_ENABLED,
+  FINISH_ORBIT_RANGE_METERS,
+  FINISH_ORBIT_TILT_DEGREES,
+  FINISH_ORBIT_SECONDS_PER_REV,
+  FINISH_ORBIT_DIRECTION,
+  FINISH_ORBIT_LOOKAT_HEIGHT_METERS,
   ELLIPSE_FLYBY,
   FIRST_PERSON_CAMERA_HEIGHT_MAX_METERS,
   FIRST_PERSON_CAMERA_HEIGHT_MIN_METERS,
@@ -158,8 +164,13 @@ import {
   RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS,
   RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS,
   RECORDING_MAP_VIEWPORT_WIDTH_PIXELS,
-  RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS,
-  RECORDING_WINDOW_RESIZE_VERIFY_MS,
+  DEFAULT_THEATER_HIDE_CLOCK,
+  DEFAULT_THEATER_HIDE_METERS,
+  DEFAULT_THEATER_HIDE_DOCK,
+  DEFAULT_THEATER_HIDE_CLIMB_BANNER,
+  DEFAULT_THEATER_HIDE_DEMO_CHIP,
+  DEFAULT_THEATER_HIDE_CONTROLS,
+  DEFAULT_THEATER_HIDE_MINIMAP,
   SCREENSHOT_WIDTH_MAX,
   SCREENSHOT_WIDTH_MIN,
   SIMULATION_SPEED_MAX_KPH,
@@ -328,6 +339,15 @@ const state = {
   lastLiftComputeMs: 0,
   lastLiftSmoothMs: 0,
   mapFullscreen: false,
+  theaterMode: false,
+  finishOrbitActive: false,
+  theaterHideClock: DEFAULT_THEATER_HIDE_CLOCK,
+  theaterHideMeters: DEFAULT_THEATER_HIDE_METERS,
+  theaterHideDock: DEFAULT_THEATER_HIDE_DOCK,
+  theaterHideClimbBanner: DEFAULT_THEATER_HIDE_CLIMB_BANNER,
+  theaterHideDemoChip: DEFAULT_THEATER_HIDE_DEMO_CHIP,
+  theaterHideControls: DEFAULT_THEATER_HIDE_CONTROLS,
+  theaterHideMinimap: DEFAULT_THEATER_HIDE_MINIMAP,
   distanceUnits: "metric",
   energyUnits: "kcal",
   timeFormat: DEFAULT_TIME_FORMAT,
@@ -435,6 +455,13 @@ const els = {
   connectHrBtn: document.querySelector("#connectHrBtn"),
   demoModeBtn: document.querySelector("#demoModeBtn"),
   resizeRecordingWindowBtn: document.querySelector("#resizeRecordingWindowBtn"),
+  theaterHideClockInput: document.querySelector("#theaterHideClockInput"),
+  theaterHideMetersInput: document.querySelector("#theaterHideMetersInput"),
+  theaterHideDockInput: document.querySelector("#theaterHideDockInput"),
+  theaterHideClimbBannerInput: document.querySelector("#theaterHideClimbBannerInput"),
+  theaterHideDemoChipInput: document.querySelector("#theaterHideDemoChipInput"),
+  theaterHideControlsInput: document.querySelector("#theaterHideControlsInput"),
+  theaterHideMinimapInput: document.querySelector("#theaterHideMinimapInput"),
   demoBanner: document.querySelector("#demoBanner"),
   restingHeartRateInput: document.querySelector("#restingHeartRateInput"),
   maxHeartRateInput: document.querySelector("#maxHeartRateInput"),
@@ -806,6 +833,13 @@ function bindEvents() {
   els.minimapInput.addEventListener("change", updateDisplaySettingsFromControls);
   els.mapLabelsInput.addEventListener("change", updateDisplaySettingsFromControls);
   els.cameraDebugInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideClockInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideMetersInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideDockInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideClimbBannerInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideDemoChipInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideControlsInput.addEventListener("change", updateDisplaySettingsFromControls);
+  els.theaterHideMinimapInput.addEventListener("change", updateDisplaySettingsFromControls);
   els.cameraDebugCollapseBtn.addEventListener("click", toggleCameraDebugCollapsed);
   els.hudLessBtn.addEventListener("click", () => adjustHudVisibleCount(-1));
   els.hudMoreBtn.addEventListener("click", () => adjustHudVisibleCount(1));
@@ -838,7 +872,7 @@ function bindEvents() {
   els.connectBtn.addEventListener("click", connectTrainer);
   els.connectHrBtn.addEventListener("click", connectHeartRate);
   els.demoModeBtn.addEventListener("click", toggleDemoMode);
-  els.resizeRecordingWindowBtn.addEventListener("click", resizeWindowForRecording);
+  els.resizeRecordingWindowBtn.addEventListener("click", toggleTheaterMode);
   els.startBtn.addEventListener("click", toggleSimulation);
   els.resetBtn.addEventListener("click", resetRide);
   els.downloadFitBtn.addEventListener("click", downloadFitFile);
@@ -883,6 +917,10 @@ function bindEvents() {
       closeCameraViewMenu();
       return;
     }
+    if (event.key === "Escape" && state.theaterMode) {
+      exitTheaterMode();
+      return;
+    }
     // When the settings or gallery dialog is open, Escape closes it
     // (natively) and must not also kick the rider out of fullscreen.
     if (
@@ -892,6 +930,7 @@ function bindEvents() {
   });
   document.addEventListener("click", closeOverviewModeMenuOnOutsideClick);
   document.addEventListener("click", closeZoneHelpOnOutsideClick);
+  document.addEventListener("click", closeTheaterModeOnOutsideClick);
   window.addEventListener("beforeunload", () => {
     saveRide();
     persistRideLog();
@@ -1962,40 +2001,44 @@ function syncDemoBannerPosition() {
   els.demoBanner.style.top = `${els.climbBanner.offsetTop + els.climbBanner.offsetHeight + gap}px`;
 }
 
-async function resizeWindowForRecording() {
+// "Theater mode": rather than resizing the actual browser window (most
+// browsers block scripted resizing of a window/tab they didn't open via
+// window.open()), pin the map viewport itself to exactly 1280x720 CSS
+// pixels via the .theater-mode class (styles.css), centered over a dimmed
+// backdrop, so a screen recording always captures a consistent size.
+// Dismissed by Escape or a click outside the map (see the shared document
+// keydown/click handlers), same convention as the camera/overview menus.
+function toggleTheaterMode(event) {
+  event.stopPropagation();
+  if (state.theaterMode) exitTheaterMode();
+  else enterTheaterMode();
+}
+
+function enterTheaterMode() {
   if (document.fullscreenElement) {
-    updateProgressLabel("Exit fullscreen before resizing the recording window.");
+    updateProgressLabel("Exit fullscreen before opening the 1280x720 map view.");
     return;
   }
 
-  if (typeof window.resizeBy !== "function") {
-    updateProgressLabel("This browser does not expose window resizing.");
-    return;
+  state.theaterMode = true;
+  els.mapViewport.classList.add("theater-mode");
+  els.resizeRecordingWindowBtn.setAttribute("aria-pressed", "true");
+  els.resizeRecordingWindowBtn.title = "Exit the 1280x720 map view";
+  reportTheaterModeSize();
+}
+
+function exitTheaterMode() {
+  state.theaterMode = false;
+  els.mapViewport.classList.remove("theater-mode");
+  els.resizeRecordingWindowBtn.setAttribute("aria-pressed", "false");
+  els.resizeRecordingWindowBtn.title = "Frame the map at exactly 1280x720 px for recording";
+  if (state.route.length) renderProfile();
+}
+
+function closeTheaterModeOnOutsideClick(event) {
+  if (state.theaterMode && !els.mapViewport.contains(event.target)) {
+    exitTheaterMode();
   }
-
-  let outerWindowChanged = false;
-  for (let attempt = 0; attempt < RECORDING_WINDOW_RESIZE_MAX_ATTEMPTS; attempt += 1) {
-    const size = currentMapViewportPixelSize();
-    const deltaWidth = RECORDING_MAP_VIEWPORT_WIDTH_PIXELS - size.width;
-    const deltaHeight = RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS - size.height;
-    if (recordingMapViewportIsSized(size)) {
-      reportRecordingWindowResize(size);
-      return;
-    }
-
-    const outerWidthBefore = window.outerWidth;
-    const outerHeightBefore = window.outerHeight;
-    try {
-      window.resizeBy(deltaWidth, deltaHeight);
-    } catch {
-      updateProgressLabel("Browser blocked window resizing.");
-      return;
-    }
-    await wait(RECORDING_WINDOW_RESIZE_VERIFY_MS);
-    outerWindowChanged ||= window.outerWidth !== outerWidthBefore || window.outerHeight !== outerHeightBefore;
-  }
-
-  reportRecordingWindowResize(currentMapViewportPixelSize(), { blocked: !outerWindowChanged });
 }
 
 function currentMapViewportPixelSize() {
@@ -2011,10 +2054,10 @@ function recordingMapViewportIsSized(size) {
     && Math.abs(size.height - RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS) <= RECORDING_MAP_VIEWPORT_TOLERANCE_PIXELS;
 }
 
-function reportRecordingWindowResize(size, { blocked = false } = {}) {
-  if (state.route.length) {
-    renderProfile();
-  }
+function reportTheaterModeSize() {
+  if (state.route.length) renderProfile();
+
+  const size = currentMapViewportPixelSize();
   if (recordingMapViewportIsSized(size)) {
     updateProgressLabel(
       `Map view set to ${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}x${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS} px.`,
@@ -2022,16 +2065,10 @@ function reportRecordingWindowResize(size, { blocked = false } = {}) {
     return;
   }
 
-  const current = `${size.width}x${size.height} px`;
-  if (blocked) {
-    updateProgressLabel(`Browser blocked window resizing; map view is ${current}.`);
-  } else {
-    updateProgressLabel(`Map view is ${current}; screen limits may be in the way.`);
-  }
-}
-
-function wait(milliseconds) {
-  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+  updateProgressLabel(
+    `Map view is ${size.width}x${size.height} px — enlarge the browser window to fit the full `
+      + `${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}x${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS} view.`,
+  );
 }
 
 function updatePedalingFromSpeed() {
@@ -2068,6 +2105,7 @@ function ensureMovementLoop() {
   // from the route overview when the rider starts pedaling.
   if (isMoving()) {
     state.overviewActive = false;
+    state.finishOrbitActive = false;
     if (state.focusedClimbIndex !== null) {
       state.focusedClimbIndex = null;
       syncFocusedClimbList();
@@ -2211,6 +2249,7 @@ function tick(now) {
       });
     }
     state.movementLoopActive = false;
+    enterFinishOrbit();
     ensureCameraFlightLoop();
     updateStartButton();
     saveRide();
@@ -3012,10 +3051,14 @@ function enterOverviewMode({
   mode = state.overviewMode,
 } = {}) {
   // Overview can be shown whenever a route is loaded — while parked or, as a
-  // deliberate user choice, while riding. The only automatic transitions are
-  // "route loaded → overview on" (loadRoute / restore) and "movement started →
-  // overview off" (ensureMovementLoop); everything else here is user-driven.
+  // deliberate user choice, while riding. The automatic transitions are
+  // "route loaded → overview on" (loadRoute / restore), "movement started →
+  // overview off" (ensureMovementLoop), and "ride just finished → finish-line
+  // orbit on" (enterFinishOrbit, below); everything else here is user-driven.
   if (!route.length || !state.map) return;
+  // Any call here (user toggle, a new climb/segment focus, a fresh route)
+  // supersedes a running finish-line orbit.
+  state.finishOrbitActive = false;
   const focusingWholeRoute = route === state.route;
   if (focusingWholeRoute && (state.focusedClimbIndex !== null || state.selectedProfileSegment)) {
     state.focusedClimbIndex = null;
@@ -3054,6 +3097,41 @@ function enterOverviewMode({
     return;
   }
   ensureCameraFlightLoop();
+}
+
+// Fired once, right as a ride (pedaled, simulated, or demo) reaches the end of
+// the route (see the finish check in tick()). Unlike enterOverviewMode, this
+// doesn't fit the camera to a route shape — the "route" at the finish line is
+// a single point with no spread to frame — so it builds the orbit's base
+// camera directly around that point and drives it through the same animated
+// orbit loop as the other overview modes (stepOverviewAnimation picks the
+// finish-orbit's own speed/direction via state.finishOrbitActive).
+function enterFinishOrbit() {
+  if (!DEFAULT_FINISH_ORBIT_ENABLED || !state.route.length || !state.map) return;
+
+  const finishPoint = interpolateRoutePoint(state.route, state.progressMeters);
+  if (!finishPoint) return;
+  const previousPoint = interpolateRoutePoint(state.route, Math.max(0, state.progressMeters - HEADING_SAMPLE_METERS));
+  const heading = bearing(previousPoint, finishPoint);
+
+  state.overviewActive = true;
+  state.finishOrbitActive = true;
+  state.overviewRoute = state.route;
+  state.activeOverviewMode = "orbit";
+  syncOverviewControls();
+  state.map.fov = DEFAULT_MAP_FOV_DEGREES;
+  state.overviewCamera = {
+    center: {
+      lat: finishPoint.lat,
+      lng: finishPoint.lng,
+      altitude: (Number(finishPoint.ele) || 0) + FINISH_ORBIT_LOOKAT_HEIGHT_METERS,
+    },
+    heading,
+    tilt: FINISH_ORBIT_TILT_DEGREES,
+    range: FINISH_ORBIT_RANGE_METERS,
+  };
+  state.cameraMode = "overview";
+  startOverviewAnimation();
 }
 
 // Camera fit parameters per overview mode. The satellite modes look nearly
@@ -3098,6 +3176,7 @@ function isAnimatedOverviewMode(mode) {
 
 function returnToRiderCamera() {
   state.overviewActive = false;
+  state.finishOrbitActive = false;
   state.climbOverviewMenuOpen = false;
   closeOverviewModeMenu();
   clearOverviewAnimation();
@@ -3205,12 +3284,14 @@ function stepOverviewAnimation(now) {
 
   let pose = null;
   if (anim.mode === "orbit") {
-    const secondsPerRevolution = focusedRouteRange() && state.overviewRoute !== state.route
-      ? state.climbOrbitSecondsPerRev
-      : OVERVIEW_ORBIT_SECONDS_PER_REV;
+    const secondsPerRevolution = state.finishOrbitActive
+      ? FINISH_ORBIT_SECONDS_PER_REV
+      : focusedRouteRange() && state.overviewRoute !== state.route
+        ? state.climbOrbitSecondsPerRev
+        : OVERVIEW_ORBIT_SECONDS_PER_REV;
     const cam = orbitCamera(state.overviewCamera, (now - anim.startMs) / 1000, {
       secondsPerRevolution,
-      direction: OVERVIEW_ORBIT_DIRECTION,
+      direction: state.finishOrbitActive ? FINISH_ORBIT_DIRECTION : OVERVIEW_ORBIT_DIRECTION,
     });
     const eye = cam && cameraEyePosition(cam);
     if (eye) pose = { eye, center: cam.center, heading: cam.heading, roll: 0, fov: DEFAULT_MAP_FOV_DEGREES };
@@ -3418,6 +3499,7 @@ function endUserInteraction() {
     // the overview is then an explicit action via the overview control.
     clearOverviewAnimation();
     state.overviewActive = false;
+    state.finishOrbitActive = false;
     state.climbOverviewMenuOpen = false;
     state.cameraMode = "manual";
   }
@@ -3962,6 +4044,13 @@ function updateDisplaySettingsFromControls() {
   state.showMinimap = els.minimapInput.checked;
   state.mapLabelsEnabled = els.mapLabelsInput.checked;
   state.cameraDebugEnabled = els.cameraDebugInput.checked;
+  state.theaterHideClock = els.theaterHideClockInput.checked;
+  state.theaterHideMeters = els.theaterHideMetersInput.checked;
+  state.theaterHideDock = els.theaterHideDockInput.checked;
+  state.theaterHideClimbBanner = els.theaterHideClimbBannerInput.checked;
+  state.theaterHideDemoChip = els.theaterHideDemoChipInput.checked;
+  state.theaterHideControls = els.theaterHideControlsInput.checked;
+  state.theaterHideMinimap = els.theaterHideMinimapInput.checked;
   saveSettings();
   applyDisplaySettings();
 }
@@ -3970,6 +4059,13 @@ function syncDisplayControls() {
   els.minimapInput.checked = state.showMinimap;
   els.mapLabelsInput.checked = state.mapLabelsEnabled;
   els.cameraDebugInput.checked = state.cameraDebugEnabled;
+  els.theaterHideClockInput.checked = state.theaterHideClock;
+  els.theaterHideMetersInput.checked = state.theaterHideMeters;
+  els.theaterHideDockInput.checked = state.theaterHideDock;
+  els.theaterHideClimbBannerInput.checked = state.theaterHideClimbBanner;
+  els.theaterHideDemoChipInput.checked = state.theaterHideDemoChip;
+  els.theaterHideControlsInput.checked = state.theaterHideControls;
+  els.theaterHideMinimapInput.checked = state.theaterHideMinimap;
   renderHudOrderControls();
 }
 
@@ -3979,6 +4075,17 @@ function applyDisplaySettings() {
   layoutMetricTiles();
   applyMapMode();
   applyCameraDebug();
+  applyTheaterHudToggles();
+}
+
+function applyTheaterHudToggles() {
+  els.mapViewport.classList.toggle("theater-hide-clock", state.theaterHideClock);
+  els.mapViewport.classList.toggle("theater-hide-meters", state.theaterHideMeters);
+  els.mapViewport.classList.toggle("theater-hide-dock", state.theaterHideDock);
+  els.mapViewport.classList.toggle("theater-hide-climb-banner", state.theaterHideClimbBanner);
+  els.mapViewport.classList.toggle("theater-hide-demo-chip", state.theaterHideDemoChip);
+  els.mapViewport.classList.toggle("theater-hide-controls", state.theaterHideControls);
+  els.mapViewport.classList.toggle("theater-hide-minimap", state.theaterHideMinimap);
 }
 
 function applyHudFieldOrder() {
@@ -4671,6 +4778,7 @@ function initializeMapHud() {
 }
 
 function enterMapFullscreen() {
+  if (state.theaterMode) exitTheaterMode();
   state.mapFullscreen = true;
   // The button's enter/exit icons swap on this class (see styles.css).
   els.mapViewport.classList.add("fullscreen-mode");
@@ -4895,6 +5003,28 @@ function restoreSettings() {
     state.cameraDebugCollapsed = settings.cameraDebugCollapsed;
   }
 
+  if (typeof settings?.theaterHideClock === "boolean") {
+    state.theaterHideClock = settings.theaterHideClock;
+  }
+  if (typeof settings?.theaterHideMeters === "boolean") {
+    state.theaterHideMeters = settings.theaterHideMeters;
+  }
+  if (typeof settings?.theaterHideDock === "boolean") {
+    state.theaterHideDock = settings.theaterHideDock;
+  }
+  if (typeof settings?.theaterHideClimbBanner === "boolean") {
+    state.theaterHideClimbBanner = settings.theaterHideClimbBanner;
+  }
+  if (typeof settings?.theaterHideDemoChip === "boolean") {
+    state.theaterHideDemoChip = settings.theaterHideDemoChip;
+  }
+  if (typeof settings?.theaterHideControls === "boolean") {
+    state.theaterHideControls = settings.theaterHideControls;
+  }
+  if (typeof settings?.theaterHideMinimap === "boolean") {
+    state.theaterHideMinimap = settings.theaterHideMinimap;
+  }
+
   if (Array.isArray(settings?.hudFieldOrder)) {
     state.hudFieldOrder = normalizeHudOrder(settings.hudFieldOrder);
   } else if (settings?.hudElements && typeof settings.hudElements === "object") {
@@ -4986,6 +5116,13 @@ function saveSettings() {
     mapLabelsEnabled: state.mapLabelsEnabled,
     cameraDebugEnabled: state.cameraDebugEnabled,
     cameraDebugCollapsed: state.cameraDebugCollapsed,
+    theaterHideClock: state.theaterHideClock,
+    theaterHideMeters: state.theaterHideMeters,
+    theaterHideDock: state.theaterHideDock,
+    theaterHideClimbBanner: state.theaterHideClimbBanner,
+    theaterHideDemoChip: state.theaterHideDemoChip,
+    theaterHideControls: state.theaterHideControls,
+    theaterHideMinimap: state.theaterHideMinimap,
     hudFieldOrder: [...state.hudFieldOrder],
     hudVisibleCount: state.hudVisibleCount,
     hudDockCollapsed: state.hudDockCollapsed,
