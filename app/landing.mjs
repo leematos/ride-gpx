@@ -219,10 +219,10 @@ class HeroReplay {
       this.buildRoute();
       this.mapReady = true;
     } catch (e) {
-      console.warn("[GPX Rider] map unavailable, using still fallback:", e && e.message);
+      console.warn("[GPX Rider] map unavailable:", e && e.message);
       this.mapReady = false;
       const fb = this.$("gpxr-fallback");
-      if (fb) { fb.src = H.fallbackImagePath; fb.style.opacity = "1"; }
+      if (fb && H.fallbackImagePath) { fb.src = H.fallbackImagePath; fb.style.opacity = "1"; }
       this.set("v-mode", "Preview");
     }
     this.startLoop();

@@ -714,10 +714,10 @@ export const LANDING_HERO = {
   orbitSeconds: 22,
 
   // Assets the hero pulls in, relative to app/. The rider marker mesh is the
-  // same model the app rides on; the fallback still shows when the 3D map
-  // can't load (no API key / unsupported browser).
+  // same model the app rides on; set fallbackImagePath to a still image when
+  // the 3D map should have an image fallback for no-key/unsupported cases.
   riderModelPath: "assets/rider-dot.glb",
-  fallbackImagePath: "images/ride.jpg",
+  fallbackImagePath: "",
 
   // Detected climbs on the replayed route, as [startMeters, endMeters] spans
   // (end clamped to route length). Matches the Ještěd route's three steps so
