@@ -21,10 +21,10 @@
     </style>
   </head>
   <body>
-    <div style="width:100%; max-width:1440px; margin:0 auto; background:#0a0b0d; overflow:hidden;">
+    <div style="width:100%; max-width:1440px; margin:0 auto; background:#0a0b0d; overflow:visible;">
 
       <!-- ================= HERO: LIVE 3D REPLAY ================= -->
-      <div id="gpxr-hero" style="position:relative; height:92vh; min-height:788px; overflow:hidden; background:#0a0b0d;">
+      <div id="gpxr-hero" style="position:relative; width:100vw; margin-left:calc(50% - 50vw); height:92vh; min-height:788px; overflow:hidden; background:#0a0b0d;">
 
 <!-- src is set by landing.mjs only if the 3D map can't load, so the happy
              path never downloads this large still. -->
@@ -34,6 +34,8 @@
 
         <!-- dim + blur applied together to map and HUD via filter -->
         <div id="gpxr-scrim" style="position:absolute; inset:0; z-index:2; pointer-events:none;"></div>
+
+        <div id="gpxr-hero-content" style="position:absolute; inset:0; z-index:5; width:100%; max-width:1440px; margin:0 auto; pointer-events:none;">
 
         <!-- NAV -->
         <div style="position:absolute; top:0; left:0; right:0; z-index:6; display:flex; align-items:center; justify-content:space-between; padding:22px 40px;">
@@ -98,7 +100,7 @@
         <div style="position:absolute; left:40px; bottom:62px; right:40px; z-index:5;">
           <h1 style="margin:0; font-size:64px; line-height:.98; font-weight:700; letter-spacing:-.02em; max-width:860px; text-shadow:0 4px 44px rgba(0,0,0,.85), 0 2px 14px rgba(0,0,0,.9);">Ride any route<br>on Earth.</h1>
           <p style="margin:20px 0 0; font-size:20px; line-height:1.5; max-width:540px; color:rgba(233,235,238,.9); text-shadow:0 2px 24px rgba(0,0,0,.8);">Drop in a GPX and ride the real terrain in photorealistic 3D, with the road grade driving your smart trainer. Free, open-source, no install.</p>
-          <div style="display:flex; align-items:center; gap:14px; margin-top:28px;">
+          <div style="display:flex; align-items:center; gap:14px; margin-top:28px; pointer-events:auto;">
             <a href="app.html?route=0050_jested" style="display:inline-flex; align-items:center; gap:10px; background:#ff6a2b; color:#0a0b0d; font-weight:600; font-size:17px; padding:16px 26px; border-radius:12px; box-shadow:0 12px 40px rgba(255,106,43,.5);">Launch GPX Rider <span style="font-family:'JetBrains Mono',monospace;">→</span></a>
             <a href="https://github.com/ziizii/gpx-rider" style="display:inline-flex; align-items:center; gap:10px; color:#e9ebee; font-weight:500; font-size:17px; padding:16px 24px; border-radius:12px; background:rgba(14,16,20,.68); border:1px solid rgba(255,255,255,.18); backdrop-filter:blur(10px);"><span style="width:8px;height:8px;border-radius:50%;background:#e9ebee;"></span>Star on GitHub</a>
           </div>
@@ -108,6 +110,8 @@
 <span style="display:inline-flex; align-items:center; gap:8px; color:rgba(233,235,238,.9); background:rgba(14,16,20,.5); border:1px solid rgba(255,255,255,.14); padding:7px 13px; border-radius:100px; backdrop-filter:blur(6px); text-shadow:0 1px 6px rgba(0,0,0,.7);"><span style="width:6px;height:6px;border-radius:50%;background:#57b877;"></span>Nothing uploaded</span>
 <span style="display:inline-flex; align-items:center; gap:8px; color:rgba(233,235,238,.9); background:rgba(14,16,20,.5); border:1px solid rgba(255,255,255,.14); padding:7px 13px; border-radius:100px; backdrop-filter:blur(6px); text-shadow:0 1px 6px rgba(0,0,0,.7);"><span style="width:6px;height:6px;border-radius:50%;background:#57b877;"></span>Export FIT files</span>          </div>
         </div>
+
+        </div><!-- /gpxr-hero-content -->
 
         <div id="gpxr-fade" style="position:absolute; inset:0; z-index:7; background:#0a0b0d; opacity:0; pointer-events:none; transition:opacity .05s linear;"></div>
       </div>
