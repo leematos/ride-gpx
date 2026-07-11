@@ -292,18 +292,20 @@ body {
   background: #000;
 }
 
-/* "Theater mode": pins the map viewport to an exact 1280x720 CSS-pixel box,
-   centered over a dimmed backdrop (the huge box-shadow spread), so a screen
-   recording captures a consistent size without needing the browser window
-   itself resized (most browsers block scripted resizing of a window/tab
-   they didn't open via window.open()). Shrinks via max-width/height if the
-   browser window itself is smaller than 1280x720. */
+/* "Theater mode": pins the map viewport to an exact CSS-pixel box, centered
+   over a dimmed backdrop (the huge box-shadow spread), so a screen recording
+   captures a consistent size without needing the browser window itself
+   resized (most browsers block scripted resizing of a window/tab they didn't
+   open via window.open()). The size is RECORDING_MAP_VIEWPORT_* from
+   tuning.yaml, stamped onto these variables at boot by initTheaterModeUi —
+   never hardcode it here. Shrinks via max-width/height if the browser window
+   itself is smaller than the recording size. */
 .map-viewport.theater-mode {
   position: fixed;
   inset: 0;
   z-index: 45;
-  width: 1280px;
-  height: 720px;
+  width: var(--recording-viewport-w, 1280px);
+  height: var(--recording-viewport-h, 720px);
   max-width: 100vw;
   max-height: 100vh;
   margin: auto;

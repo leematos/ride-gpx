@@ -78,7 +78,7 @@ import {
   handleTrainerStatus,
   handleTrainerTelemetry,
 } from "./ride/telemetry-ui.mjs";
-import { closeTheaterModeOnOutsideClick, exitTheaterMode, toggleTheaterMode } from "./hud/theater-mode.mjs";
+import { closeTheaterModeOnOutsideClick, exitTheaterMode, initTheaterModeUi, toggleTheaterMode } from "./hud/theater-mode.mjs";
 import { connectTrainer, initTrainer, reconnectSavedTrainer } from "./trainer/trainer.mjs";
 import {
   closeZoneHelpOnOutsideClick,
@@ -128,6 +128,7 @@ async function startApp() {
   // own HUD element; the weights encode the column order (see each register
   // function). map-hud registers its own pieces inside initializeMapHud.
   initScreenManager(els.mapViewport);
+  initTheaterModeUi();
   registerClimbBannerHud();
   registerDemoBannerHud();
   registerTrainingMetersHud();

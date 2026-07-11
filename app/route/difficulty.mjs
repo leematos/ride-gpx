@@ -19,21 +19,29 @@ function classify(value, thresholds) {
 // Classifies a route from distance and total elevation gain alone — no
 // power, speed, rider weight, weather, surface, or post-ride effort data.
 // Returns null for a routeless/zero-distance state (nothing to classify).
-export function classifyRoute(distanceMeters, elevationGainMeters) {
+// The threshold tables are explicit parameters (tests pass fixed tables so
+// tuning changes can never break them); the tuning constants are only the
+// scale the app ships with.
+export function classifyRoute(distanceMeters, elevationGainMeters, {
+  equivalentKmClimbMeters = EQUIVALENT_KM_CLIMB_METERS,
+  distanceThresholdsKm = DISTANCE_CLASS_THRESHOLDS_KM,
+  terrainThresholdsMPerKm = TERRAIN_CLASS_THRESHOLDS_M_PER_KM,
+  difficultyThresholdsEquivalentKm = DIFFICULTY_THRESHOLDS_EQUIVALENT_KM,
+} = {}) {
   const distanceKm = distanceMeters / 1000;
   if (!(distanceKm > 0)) return null;
 
   const elevationGainM = Math.max(0, elevationGainMeters);
   const elevationPerKm = elevationGainM / distanceKm;
-  const equivalentKm = distanceKm + elevationGainM / EQUIVALENT_KM_CLIMB_METERS;
+  const equivalentKm = distanceKm + elevationGainM / equivalentKmClimbMeters;
 
   return {
     distanceKm,
     elevationGainM,
     elevationPerKm,
     equivalentKm,
-    distanceClass: classify(distanceKm, DISTANCE_CLASS_THRESHOLDS_KM),
-    terrainClass: classify(elevationPerKm, TERRAIN_CLASS_THRESHOLDS_M_PER_KM),
-    difficulty: classify(equivalentKm, DIFFICULTY_THRESHOLDS_EQUIVALENT_KM),
+    distanceClass: classify(distanceKm, distanceThresholdsKm),
+    terrainClass: classify(elevationPerKm, terrainThresholdsMPerKm),
+    difficulty: classify(equivalentKm, difficultyThresholdsEquivalentKm),
   };
 }

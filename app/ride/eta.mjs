@@ -16,12 +16,21 @@ import {
   ETA_MIN_HISTORY_SECONDS,
 } from "../core/tuning.mjs";
 
-export function flatEquivalentMeters({ distanceMeters, ascentMeters = 0, descentMeters = 0 }) {
+// The model factors are explicit parameters (tests pass fixed values so
+// tuning changes can never break them); the tuning constants are only the
+// defaults the app runs with.
+export function flatEquivalentMeters({
+  distanceMeters,
+  ascentMeters = 0,
+  descentMeters = 0,
+  climbEquivalentFactor = ETA_CLIMB_EQUIVALENT_FACTOR,
+  descentCreditFactor = ETA_DESCENT_CREDIT_FACTOR,
+}) {
   return Math.max(
     0,
     distanceMeters
-      + ascentMeters * ETA_CLIMB_EQUIVALENT_FACTOR
-      - descentMeters * ETA_DESCENT_CREDIT_FACTOR,
+      + ascentMeters * climbEquivalentFactor
+      - descentMeters * descentCreditFactor,
   );
 }
 
@@ -31,26 +40,43 @@ export function createRideEstimator() {
   return { movingSeconds: 0, equivalentMeters: 0 };
 }
 
-export function recordEstimatorTick(estimator, { elapsedSeconds, distanceMeters, ascentMeters = 0, descentMeters = 0 }) {
+export function recordEstimatorTick(estimator, {
+  elapsedSeconds,
+  distanceMeters,
+  ascentMeters = 0,
+  descentMeters = 0,
+  climbEquivalentFactor,
+  descentCreditFactor,
+}) {
   if (!(elapsedSeconds > 0) || !(distanceMeters > 0)) return;
   estimator.movingSeconds += elapsedSeconds;
-  estimator.equivalentMeters += flatEquivalentMeters({ distanceMeters, ascentMeters, descentMeters });
+  estimator.equivalentMeters += flatEquivalentMeters({
+    distanceMeters,
+    ascentMeters,
+    descentMeters,
+    ...(climbEquivalentFactor !== undefined && { climbEquivalentFactor }),
+    ...(descentCreditFactor !== undefined && { descentCreditFactor }),
+  });
 }
 
 // Remaining seconds to the finish, or null when there is nothing to go on
 // (no ride history yet and no usable fallback speed). Until enough history
-// accrues (ETA_MIN_HISTORY_*), the estimate falls back to raw
-// remaining-distance ÷ fallbackSpeedKph.
+// accrues (minHistorySeconds/minHistoryMeters), the estimate falls back to
+// raw remaining-distance ÷ fallbackSpeedKph.
 export function estimateRemainingSeconds(estimator, {
   remainingMeters,
   remainingAscentMeters = 0,
   remainingDescentMeters = 0,
   fallbackSpeedKph = null,
+  climbEquivalentFactor,
+  descentCreditFactor,
+  minHistorySeconds = ETA_MIN_HISTORY_SECONDS,
+  minHistoryMeters = ETA_MIN_HISTORY_METERS,
 }) {
   if (!(remainingMeters > 0)) return 0;
 
-  const hasHistory = estimator.movingSeconds >= ETA_MIN_HISTORY_SECONDS
-    && estimator.equivalentMeters >= ETA_MIN_HISTORY_METERS;
+  const hasHistory = estimator.movingSeconds >= minHistorySeconds
+    && estimator.equivalentMeters >= minHistoryMeters;
   if (hasHistory) {
     const paceMetersPerSecond = estimator.equivalentMeters / estimator.movingSeconds;
     if (paceMetersPerSecond > 0) {
@@ -58,6 +84,8 @@ export function estimateRemainingSeconds(estimator, {
         distanceMeters: remainingMeters,
         ascentMeters: remainingAscentMeters,
         descentMeters: remainingDescentMeters,
+        ...(climbEquivalentFactor !== undefined && { climbEquivalentFactor }),
+        ...(descentCreditFactor !== undefined && { descentCreditFactor }),
       }) / paceMetersPerSecond;
     }
   }

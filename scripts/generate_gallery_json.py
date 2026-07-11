@@ -6,9 +6,10 @@ precomputes everything the gallery cards render — distance, noise-filtered
 ascent/descent, the distance/terrain/difficulty classification, and the
 ready-to-draw bars of the mini elevation profile. The live 3D preview camera
 comes from metadata.json when present; the browser falls back to its normal
-route overview framing when a route has not been hand-framed yet. The numbers
-mirror app/route/route.mjs and app/route/difficulty.mjs; the thresholds below are kept in
-sync with app/core/tuning.mjs by hand (no build step to import them).
+route overview framing when a route has not been hand-framed yet. All the
+thresholds and the grade palette are read from app/core/tuning.yaml (via
+tuning_config.py) — the same file the app itself loads — so nothing is
+mirrored by hand anymore.
 """
 import json
 import math
@@ -16,34 +17,32 @@ import pathlib
 import shutil
 import xml.etree.ElementTree as ET
 
+from tuning_config import load_tuning
+
+TUNING = load_tuning()
+
 GALLERY_DIR = pathlib.Path("gallery")
 APP_DIR = pathlib.Path("app")
 OUTPUT_JSON = APP_DIR / "gallery.json"
 APP_GALLERY_DIR = APP_DIR / "gallery"
 
-# Mirrors CLIMB_NOISE_THRESHOLD_METERS in app/core/tuning.mjs (enrichRoute's
-# noise-filtered ascent/descent counter), so gallery cards report the same
-# totals the app shows once the route is loaded.
-CLIMB_NOISE_THRESHOLD_METERS = 2
-# Bars drawn in each card's mini elevation profile strip.
-PROFILE_BARS = 44
+# Everything below comes straight from tuning.yaml — the same values the app
+# loads — so gallery cards always agree with the running app.
+CLIMB_NOISE_THRESHOLD_METERS = TUNING["CLIMB_NOISE_THRESHOLD_METERS"]
+PROFILE_BARS = TUNING["GALLERY_MINI_PROFILE_BAR_COUNT"]
 
-# Classification thresholds — mirror app/core/tuning.mjs / app/route/difficulty.mjs.
-EQUIVALENT_KM_CLIMB_METERS = 100
-DISTANCE_CLASS_THRESHOLDS_KM = [
-    (0, "XS"), (20, "S"), (40, "M"), (70, "L"), (110, "XL"), (160, "XXL"),
-]
-TERRAIN_CLASS_THRESHOLDS_M_PER_KM = [
-    (0, "Flat"), (5, "Gentle"), (10, "Rolling"), (20, "Hilly"), (35, "Mountainous"),
-]
-DIFFICULTY_THRESHOLDS_EQUIVALENT_KM = [
-    (0, "Very Easy"), (25, "Easy"), (50, "Moderate"),
-    (85, "Hard"), (130, "Very Hard"), (190, "Epic"),
-]
+EQUIVALENT_KM_CLIMB_METERS = TUNING["EQUIVALENT_KM_CLIMB_METERS"]
+DISTANCE_CLASS_THRESHOLDS_KM = [(row["min"], row["label"]) for row in TUNING["DISTANCE_CLASS_THRESHOLDS_KM"]]
+TERRAIN_CLASS_THRESHOLDS_M_PER_KM = [(row["min"], row["label"]) for row in TUNING["TERRAIN_CLASS_THRESHOLDS_M_PER_KM"]]
+DIFFICULTY_THRESHOLDS_EQUIVALENT_KM = [(row["min"], row["label"]) for row in TUNING["DIFFICULTY_THRESHOLDS_EQUIVALENT_KM"]]
 
-# Grade palette for the mini profile — mirrors gradeColor in app/route/profile.mjs
-# and the gallery mini-bar buckets.
-FLAT_BAR_COLOR = "rgba(200, 206, 214, 0.55)"
+# Shared grade palette (see GRADE_PROFILE_* in tuning.yaml). Cards deviate
+# from the app's profile in two deliberate ways: both descent buckets use the
+# lighter green, and the flat bucket uses a lighter tone that reads better on
+# the card background.
+GRADE_THRESHOLDS = TUNING["GRADE_PROFILE_THRESHOLDS"]
+GRADE_COLORS = TUNING["GRADE_PROFILE_COLORS"]
+FLAT_BAR_COLOR = TUNING["GALLERY_MINI_PROFILE_FLAT_COLOR"]
 
 EARTH_RADIUS_M = 6371000
 
@@ -81,15 +80,18 @@ def classify_route(distance_m, ascent_m):
 
 
 def mini_bar_color(grade_percent):
-    if grade_percent <= -0.6:
-        return "#57b877"
-    if grade_percent < 0.8:
+    # Bucket boundaries are GRADE_PROFILE_THRESHOLDS: [steep descent, easy
+    # descent, flat, gentle, moderate]; colors are the matching 6-entry
+    # palette, with the card-specific overrides described above.
+    if grade_percent <= GRADE_THRESHOLDS[1]:
+        return GRADE_COLORS[1]  # both descent buckets: the lighter green
+    if grade_percent < GRADE_THRESHOLDS[2]:
         return FLAT_BAR_COLOR
-    if grade_percent < 3.5:
-        return "#e8b74e"
-    if grade_percent < 7:
-        return "#e8823c"
-    return "#d9542f"
+    if grade_percent < GRADE_THRESHOLDS[3]:
+        return GRADE_COLORS[3]
+    if grade_percent < GRADE_THRESHOLDS[4]:
+        return GRADE_COLORS[4]
+    return GRADE_COLORS[5]
 
 
 def parse_gpx(path):

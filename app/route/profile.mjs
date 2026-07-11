@@ -1,6 +1,7 @@
 // Elevation profile canvas: gradient-colored grade bars, elevation line,
 // unit-aware axes, ride-position marker, and hover inspection.
 
+import { GRADE_PROFILE_COLORS, GRADE_PROFILE_THRESHOLDS } from "../core/tuning.mjs";
 import { clamp } from "../core/geo.mjs";
 import { gradeAt, interpolateRoutePoint, routeTotalDistance } from "./route.mjs";
 import { FEET_PER_METER, KM_PER_MILE, distanceUnitLabel, kmToDisplay } from "../core/units.mjs";
@@ -587,19 +588,11 @@ function niceStep(range, candidates) {
   return candidates.at(-1);
 }
 
-// Stepped grade palette shared with the panel legend and the gallery's mini
-// profiles: green for descents, gray for flat, amber -> orange -> red as the
-// climb steepens. Exported so the map HUD and fullscreen climb banner color
-// from the same palette instead of copying it again.
-export const GRADE_PROFILE_COLORS = [
-  "#3fae6a",
-  "#57b877",
-  "rgba(125, 138, 134, 0.55)",
-  "#e8b74e",
-  "#e8823c",
-  "#d9542f",
-];
-export const GRADE_PROFILE_THRESHOLDS = [-3, -0.6, 0.8, 3.5, 7];
+// Stepped grade palette shared with the panel legend, the gallery's mini
+// profiles, AND the Python gallery generator — the values live in
+// core/tuning.yaml (one source for both languages); re-exported here so the
+// map HUD and fullscreen climb banner keep coloring from this module.
+export { GRADE_PROFILE_COLORS, GRADE_PROFILE_THRESHOLDS };
 
 export function gradeColor(grade) {
   if (grade <= GRADE_PROFILE_THRESHOLDS[0]) return GRADE_PROFILE_COLORS[0];

@@ -266,6 +266,7 @@ export const els = {
   connectHrBtn: document.querySelector("#connectHrBtn"),
   demoModeBtn: document.querySelector("#demoModeBtn"),
   resizeRecordingWindowBtn: document.querySelector("#resizeRecordingWindowBtn"),
+  theaterHudTogglesLabel: document.querySelector(".theater-hud-toggles-label"),
   theaterHideClockInput: document.querySelector("#theaterHideClockInput"),
   theaterHideMetersInput: document.querySelector("#theaterHideMetersInput"),
   theaterHideDockInput: document.querySelector("#theaterHideDockInput"),

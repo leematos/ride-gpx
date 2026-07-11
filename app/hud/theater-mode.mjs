@@ -14,6 +14,28 @@ import {
   RECORDING_MAP_VIEWPORT_WIDTH_PIXELS,
 } from "../core/tuning.mjs";
 
+// The one human-readable name of the configured recording size — every
+// label, title and message naming the size derives from this, so retuning
+// RECORDING_MAP_VIEWPORT_* in tuning.yaml changes the whole feature at once.
+const RECORDING_SIZE_LABEL =
+  `${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}x${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS}`;
+
+const ENTER_TITLE = `Frame the map at exactly ${RECORDING_SIZE_LABEL} px for recording`;
+const EXIT_TITLE = `Exit the ${RECORDING_SIZE_LABEL} map view`;
+
+// Stamp the configured size into everything static: the CSS variables the
+// .theater-mode rule sizes the viewport with, the settings-panel toggle
+// label, and the toggle button's text/title. Called once at boot.
+export function initTheaterModeUi() {
+  els.mapViewport.style.setProperty("--recording-viewport-w", `${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}px`);
+  els.mapViewport.style.setProperty("--recording-viewport-h", `${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS}px`);
+  els.resizeRecordingWindowBtn.textContent = `${RECORDING_SIZE_LABEL} map`;
+  els.resizeRecordingWindowBtn.title = ENTER_TITLE;
+  if (els.theaterHudTogglesLabel) {
+    els.theaterHudTogglesLabel.textContent = `Hide in ${RECORDING_SIZE_LABEL} view`;
+  }
+}
+
 export function toggleTheaterMode(event) {
   event.stopPropagation();
   if (state.theaterMode) exitTheaterMode();
@@ -22,14 +44,14 @@ export function toggleTheaterMode(event) {
 
 export function enterTheaterMode() {
   if (document.fullscreenElement) {
-    updateProgressLabel("Exit fullscreen before opening the 1280x720 map view.");
+    updateProgressLabel(`Exit fullscreen before opening the ${RECORDING_SIZE_LABEL} map view.`);
     return;
   }
 
   state.theaterMode = true;
   els.mapViewport.classList.add("theater-mode");
   els.resizeRecordingWindowBtn.setAttribute("aria-pressed", "true");
-  els.resizeRecordingWindowBtn.title = "Exit the 1280x720 map view";
+  els.resizeRecordingWindowBtn.title = EXIT_TITLE;
   reportTheaterModeSize();
 }
 
@@ -37,7 +59,7 @@ export function exitTheaterMode() {
   state.theaterMode = false;
   els.mapViewport.classList.remove("theater-mode");
   els.resizeRecordingWindowBtn.setAttribute("aria-pressed", "false");
-  els.resizeRecordingWindowBtn.title = "Frame the map at exactly 1280x720 px for recording";
+  els.resizeRecordingWindowBtn.title = ENTER_TITLE;
   if (state.route.length) renderProfile();
 }
 

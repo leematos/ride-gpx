@@ -36,7 +36,7 @@ pages, `styles.css`, `gallery.json`, and `assets/` stay at the app root.
 
 | Folder | Feature | Modules |
 |---|---|---|
-| `app/core/` | Shared foundation | `state.mjs` (the single mutable `state` object + `els` DOM map + `updateProgressLabel`; bottom of the feature import graph — must never import a feature module), `tuning.mjs` (**all tunable behavior parameters**, one documented constant each — new knobs go here, not inline), `geo.mjs` (pure geodesy: haversine, bearing, destinationPoint, clamp, lerp; tested), `units.mjs` (km/mi + kcal/kJ display formatting; internal state is always metric; tested) |
+| `app/core/` | Shared foundation | `state.mjs` (the single mutable `state` object + `els` DOM map + `updateProgressLabel`; bottom of the feature import graph — must never import a feature module), `tuning.mjs` (loads and re-exports **all tunable behavior parameters** from `tuning.yaml` under their historical names — new knobs go in the yaml, not this file), `tuning.yaml` (the actual values + one documented comment each, shared with `scripts/tuning_config.py`), `yaml.mjs` (hand-rolled parser for the small YAML subset `tuning.yaml` uses; tested), `geo.mjs` (pure geodesy: haversine, bearing, destinationPoint, clamp, lerp; tested), `units.mjs` (km/mi + kcal/kJ display formatting; internal state is always metric; tested) |
 | `app/map/` | Map rendering | `map-init.mjs` (Maps API key resolution/saving, Google Maps JS loader, 3D map + minimap creation), `route-render.mjs` (elevated 3D route lines, rider dot mesh + fallback ring, rider beacon, minimap route/marker — see the rider-dot notes below), `route-style.mjs` (pure route segment styling), `screenshot.mjs` (viewport JPG via tab capture — the 3D canvas sits in a closed shadow root and cannot be read directly) |
 | `app/camera/` | Camera behavior | `camera.mjs` (pure follow-camera math; tested), `flyover.mjs` (pure orbit math; tested), `flyby.mjs` (pure ellipse/figure-eight flight math; tested), `follow-camera.mjs` (follow/first-person targets, chase flight, terrain avoidance, manual-drag capture), `overview-camera.mjs` (overview state machine: static/satellite framing, animated orbit/fly-by/fly-over, finish orbit, return-to-rider), `camera-ui.mjs` (map action-bar camera controls + menus, camera settings sliders, first-person preset, reset button state), `camera-debug.mjs` (debug overlay readout + red travel-path debug line) |
 | `app/route/` | Route processing | `route.mjs` (GPX parsing, enrichment, interpolation, grade; tested), `climbs.mjs` (sustained-climb detection; tested), `difficulty.mjs` (classification from distance + gain; tested), `route-load.mjs` (GPX file/URL intake, `applyGpxText` route-swap sequence, once-per-load route overview), `climbs-ui.mjs` (climb/segment focus, live climb status, the HUD climb/segment banner), `profile.mjs` (elevation profile canvas drawing + hit-testing), `profile-ui.mjs` (profile rendering + hover/seek/drag-select wiring) |
@@ -64,7 +64,7 @@ wire UI, coordinator-like modules such as `movement`, `follow-camera` and
 `overview-camera` connect state, domain logic, and infrastructure). Folders
 do NOT change the layer rules — a pure module stays pure wherever it lives:
 
-1. **`core/tuning.mjs`** — constants only. Imports nothing app-level.
+1. **`core/tuning.mjs`** — constants only, loaded from `core/tuning.yaml` via `core/yaml.mjs` (a pure parser with no imports of its own). Imports nothing app-level.
 2. **Pure logic modules** (`core/geo`, `camera/camera`, `route/route`,
    `ride/eta`, `route/difficulty`, `route/climbs`, `core/units`, `ride/fit`,
    `camera/flyby`, `camera/flyover`, `demo/demo`, `map/route-style`,
@@ -150,13 +150,20 @@ or a new feature folder.
    mirror the edit in `AGENTS.md`.
 
 Tunable parameters (defaults, thresholds, physics/model factors) live in
-`app/core/tuning.mjs` with a doc comment each — never as inline magic values —
-so users can adjust behavior in one place. This is not limited to numbers:
-file paths, URLs, color strings, orientation/config objects — anything a
-user or future contributor might reasonably want to retune belongs in
-`tuning.mjs`, not inlined at its call site, even if it's only used once. When
-adding a new adjustable behavior, add its constant to `tuning.mjs` in the
-same change; don't leave it inline "for now." Deliberate exceptions:
+`app/core/tuning.yaml` with a doc comment each — never as inline magic values —
+so users can adjust behavior in one place, reload, done (no build step).
+`app/core/tuning.mjs` only loads that file (via `yaml.mjs`) and re-exports each
+value under its historical constant name, so the rest of the app is unchanged;
+`scripts/tuning_config.py` parses the exact same `tuning.yaml` (via its own
+matching hand-rolled parser, kept in sync with `yaml.mjs` — extend both plus
+their shared tests if you widen the supported YAML subset) so the Python
+generators (`generate_gallery_json.py`) never mirror a value by hand. This is
+not limited to numbers: file paths, URLs, color strings, orientation/config
+objects — anything a user or future contributor might reasonably want to
+retune belongs in `tuning.yaml`, not inlined at its call site, even if it's
+only used once. When adding a new adjustable behavior, add its constant to
+`tuning.yaml` (and the `req(...)` re-export in `tuning.mjs`) in the same
+change; don't leave it inline "for now." Deliberate exceptions:
 `app/config.mjs` (rewritten at deploy time, see below) and the BLE
 write-queue timing internals in `trainer.mjs` (hardware-safety, documented
 in place).
