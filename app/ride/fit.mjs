@@ -7,7 +7,7 @@
 // summary: { startTimeMs, totalElapsedSeconds, totalTimerSeconds,
 //            totalDistanceMeters, totalCalories (kcal, nullable) }
 
-import { APP_NAME } from "./tuning.mjs";
+import { APP_NAME } from "../core/tuning.mjs";
 
 const FIT_EPOCH_OFFSET_SECONDS = 631065600; // 1989-12-31T00:00:00Z
 const SEMICIRCLES_PER_DEGREE = 2 ** 31 / 180;

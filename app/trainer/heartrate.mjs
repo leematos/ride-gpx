@@ -2,7 +2,7 @@
 // Any strap that broadcasts Heart Rate Measurement notifications works —
 // Polar, Garmin, Wahoo TICKR, etc.
 
-import { readJson, writeJson } from "./storage.mjs";
+import { readJson, writeJson } from "../storage/storage.mjs";
 
 const HEART_RATE_SERVICE = 0x180d;
 const HEART_RATE_MEASUREMENT = 0x2a37;

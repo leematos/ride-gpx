@@ -12,8 +12,8 @@ import {
   measureCameraOffset,
   normalizeHeading,
   rangeForBehind,
-} from "../app/camera.mjs";
-import * as geo from "../app/geo.mjs";
+} from "../app/camera/camera.mjs";
+import * as geo from "../app/core/geo.mjs";
 
 const riderPosition = { lat: 50.087, lng: 14.421 };
 
@@ -425,7 +425,7 @@ test("cameraFromEyeAndCenter keeps the fallback heading when overhead", () => {
 });
 
 test("a camera flight converges from the overview to the follow camera", () => {
-  // Reproduces the app.js integration: both the eye and the look-at center
+  // Reproduces the follow-camera.mjs integration: both the eye and the look-at center
   // chase their follow-camera targets in a local north/east/up frame, and the
   // map pose is re-derived from the chased pair each frame.
   const { bearing, destinationPoint, haversine, toRad } = geo;

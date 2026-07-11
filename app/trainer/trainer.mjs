@@ -2,9 +2,9 @@
 // reconnect, control-point commands, grade (Set Simulation Parameters)
 // writes, and Indoor Bike Data telemetry parsing.
 
-import { clamp } from "./geo.mjs";
-import { readJson, writeJson } from "./storage.mjs";
-import { GRADE_INTERVAL_MAX_SECONDS, GRADE_INTERVAL_MIN_SECONDS } from "./tuning.mjs";
+import { clamp } from "../core/geo.mjs";
+import { readJson, writeJson } from "../storage/storage.mjs";
+import { GRADE_INTERVAL_MAX_SECONDS, GRADE_INTERVAL_MIN_SECONDS } from "../core/tuning.mjs";
 
 const FTMS_SERVICE = 0x1826;
 const FTMS_INDOOR_BIKE_DATA = 0x2ad2;

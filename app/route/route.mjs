@@ -1,10 +1,10 @@
-import { clamp, haversine, lerp } from "./geo.mjs";
+import { clamp, haversine, lerp } from "../core/geo.mjs";
 import {
   CLIMB_NOISE_THRESHOLD_METERS,
   GRADE_LOOKAROUND_METERS,
   GRADE_MAX_PERCENT,
   GRADE_MIN_PERCENT,
-} from "./tuning.mjs";
+} from "../core/tuning.mjs";
 
 // Returns `{ points, name }`: track/route points plus the GPX's own name
 // (from <metadata><name>, <trk><name>, or <rte><name>, in that preference
@@ -30,7 +30,12 @@ export function parseGpx(text) {
 // noise-filtered: an elevation trend only counts once it exceeds
 // CLIMB_NOISE_THRESHOLD_METERS in one direction, so meter-level GPX jitter
 // does not inflate the totals.
-export function enrichRoute(points) {
+// All thresholds are explicit parameters (tests pass fixed values so tuning
+// changes can never break them); the tuning constants are only the defaults
+// the app runs with.
+export function enrichRoute(points, {
+  noiseThresholdMeters = CLIMB_NOISE_THRESHOLD_METERS,
+} = {}) {
   let distance = 0;
   let ascent = 0;
   let descent = 0;
@@ -40,10 +45,10 @@ export function enrichRoute(points) {
     if (Number.isFinite(point.ele)) {
       if (anchorEle === null) anchorEle = point.ele;
       const delta = point.ele - anchorEle;
-      if (delta >= CLIMB_NOISE_THRESHOLD_METERS) {
+      if (delta >= noiseThresholdMeters) {
         ascent += delta;
         anchorEle = point.ele;
-      } else if (delta <= -CLIMB_NOISE_THRESHOLD_METERS) {
+      } else if (delta <= -noiseThresholdMeters) {
         descent -= delta;
         anchorEle = point.ele;
       }
@@ -168,12 +173,16 @@ export function maxElevationNear(route, location, radiusMeters) {
   return maxEle;
 }
 
-export function gradeAt(route, distance) {
-  const lookBehind = Math.max(0, distance - GRADE_LOOKAROUND_METERS);
-  const lookAhead = Math.min(routeTotalDistance(route), distance + GRADE_LOOKAROUND_METERS);
+export function gradeAt(route, distance, {
+  lookaroundMeters = GRADE_LOOKAROUND_METERS,
+  minPercent = GRADE_MIN_PERCENT,
+  maxPercent = GRADE_MAX_PERCENT,
+} = {}) {
+  const lookBehind = Math.max(0, distance - lookaroundMeters);
+  const lookAhead = Math.min(routeTotalDistance(route), distance + lookaroundMeters);
   const from = interpolateRoutePoint(route, lookBehind);
   const to = interpolateRoutePoint(route, lookAhead);
   const horizontal = Math.max(1, lookAhead - lookBehind);
   const rawGrade = ((to.ele - from.ele) / horizontal) * 100;
-  return clamp(rawGrade, GRADE_MIN_PERCENT, GRADE_MAX_PERCENT);
+  return clamp(rawGrade, minPercent, maxPercent);
 }

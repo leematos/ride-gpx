@@ -1,7 +1,7 @@
 // Pure route-styling helpers. Map renderers can turn these runs into their
 // own polyline elements without duplicating the grade-bucketing logic.
 
-import { gradeAt } from "./route.mjs";
+import { gradeAt } from "../route/route.mjs";
 
 // Split a route path only when its grade-palette color changes. Adjacent runs
 // share their boundary point, so separately rendered polylines remain a

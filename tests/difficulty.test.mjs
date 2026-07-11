@@ -1,6 +1,37 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { classifyRoute } from "../app/difficulty.mjs";
+import { classifyRoute as classifyRouteRaw } from "../app/route/difficulty.mjs";
+
+// The classification scale is pinned here so the tests exercise the
+// algorithm (bucketing, equivalent-km math, boundary inclusivity), never the
+// shipped tuning values — retuning the config must not break this suite.
+const SCALE = {
+  equivalentKmClimbMeters: 100,
+  distanceThresholdsKm: [
+    { min: 0, label: "XS" },
+    { min: 20, label: "S" },
+    { min: 40, label: "M" },
+    { min: 70, label: "L" },
+    { min: 110, label: "XL" },
+    { min: 160, label: "XXL" },
+  ],
+  terrainThresholdsMPerKm: [
+    { min: 0, label: "Flat" },
+    { min: 5, label: "Gentle" },
+    { min: 10, label: "Rolling" },
+    { min: 20, label: "Hilly" },
+    { min: 35, label: "Mountainous" },
+  ],
+  difficultyThresholdsEquivalentKm: [
+    { min: 0, label: "Very Easy" },
+    { min: 25, label: "Easy" },
+    { min: 50, label: "Moderate" },
+    { min: 85, label: "Hard" },
+    { min: 130, label: "Very Hard" },
+    { min: 190, label: "Epic" },
+  ],
+};
+const classifyRoute = (distanceMeters, gainMeters) => classifyRouteRaw(distanceMeters, gainMeters, SCALE);
 
 test("returns null for a routeless/zero-distance state", () => {
   assert.equal(classifyRoute(0, 0), null);

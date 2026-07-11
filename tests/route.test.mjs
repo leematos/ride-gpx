@@ -12,7 +12,7 @@ import {
   routeTotalDescent,
   routeTotalDistance,
   sliceRoute,
-} from "../app/route.mjs";
+} from "../app/route/route.mjs";
 
 // A short straight route heading north; consecutive points ~111 m apart.
 const points = [
@@ -69,8 +69,12 @@ test("sliceRoute interpolates exact endpoints and rebases distance", () => {
   assert.ok(Math.abs(slice.at(-1).ele - interpolateRoutePoint(route, end).ele) < 1e-9);
 });
 
+// Ascent/descent assertions pass the noise threshold explicitly so retuning
+// CLIMB_NOISE_THRESHOLD_METERS can't break them.
+const NOISE = { noiseThresholdMeters: 2 };
+
 test("enrichRoute accumulates ascent and descent along the track", () => {
-  const route = enrichRoute(points); // +5 m up, then -2 m down
+  const route = enrichRoute(points, NOISE); // +5 m up, then -2 m down
   assert.equal(route[0].ascent, 0);
   assert.equal(route[0].descent, 0);
   assert.equal(routeTotalAscent(route), 5);
@@ -85,7 +89,7 @@ test("ascent/descent ignore sub-threshold elevation noise", () => {
     { lat: 50.002, lng: 14.400, ele: 100 },
     { lat: 50.003, lng: 14.400, ele: 101 },
     { lat: 50.004, lng: 14.400, ele: 100 },
-  ]);
+  ], NOISE);
   assert.equal(routeTotalAscent(noisy), 0);
   assert.equal(routeTotalDescent(noisy), 0);
 
@@ -94,13 +98,13 @@ test("ascent/descent ignore sub-threshold elevation noise", () => {
     { lat: 50.000, lng: 14.400, ele: 100 },
     { lat: 50.001, lng: 14.400, ele: 150 },
     { lat: 50.002, lng: 14.400, ele: 200 },
-  ]);
+  ], NOISE);
   assert.equal(routeTotalAscent(climb), 100);
   assert.equal(routeTotalDescent(climb), 0);
 });
 
 test("ascentAt and descentAt interpolate cumulative climbing at a distance", () => {
-  const route = enrichRoute(points);
+  const route = enrichRoute(points, NOISE);
 
   assert.equal(ascentAt(route, 0), 0);
   assert.equal(ascentAt(route, 1e9), routeTotalAscent(route));

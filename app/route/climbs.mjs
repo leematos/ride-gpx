@@ -6,7 +6,7 @@ import {
   CLIMB_SMOOTHING_WINDOW_SIZE,
   CLIMB_MIN_GAIN_METERS,
   CLIMB_MIN_AVERAGE_GRADE_PERCENT,
-} from "./tuning.mjs";
+} from "../core/tuning.mjs";
 
 /**
  * Detects sustained climbing segments in an enriched GPX route using a Leaky Bucket model.

@@ -7,18 +7,48 @@ import {
   demoSpeedForPower,
   demoTargetPowerWatts,
   seedDemoHistory,
-} from "../app/demo.mjs";
-import { DEMO_RIDE } from "../app/tuning.mjs";
+} from "../app/demo/demo.mjs";
+
+// A pinned rider profile so the tests exercise the physics/HR model, never
+// the shipped DEMO_RIDE tuning — retuning demo mode must not break this suite.
+const TEST_RIDE = {
+  riderWeightKg: 100,
+  bikeWeightKg: 9,
+  ftpWatts: 270,
+  maxHeartRateBpm: 180,
+  restingHeartRateBpm: 86,
+  thresholdHeartRateBpm: 155,
+  maxHistorySamples: 3600,
+  flatPowerWatts: 205,
+  climbWattsPerGradePercent: 13.5,
+  descentWattsPerGradePercent: 24,
+  minPowerWatts: 85,
+  maxPowerWatts: 360,
+  powerSmoothingTauSeconds: 7,
+  rollingResistanceCoefficient: 0.005,
+  dragAreaSquareMeters: 0.48,
+  airDensityKgPerCubicMeter: 1.225,
+  drivetrainEfficiency: 0.96,
+  minSpeedKph: 5,
+  maxSpeedKph: 72,
+  speedSmoothingTauSeconds: 5,
+  heartRateUpdateIntervalSeconds: 1,
+  heartRateRiseTauSeconds: 30,
+  heartRateFallDelaySeconds: 16,
+  heartRateFallTauSeconds: 78,
+  lowEffortReturnDelaySeconds: 120,
+  heartRateNoiseBpm: 1,
+};
 
 test("demo target power rises on climbs and backs off on descents", () => {
-  assert.ok(demoTargetPowerWatts(7) > demoTargetPowerWatts(0));
-  assert.ok(demoTargetPowerWatts(-5) < demoTargetPowerWatts(0));
+  assert.ok(demoTargetPowerWatts(7, TEST_RIDE) > demoTargetPowerWatts(0, TEST_RIDE));
+  assert.ok(demoTargetPowerWatts(-5, TEST_RIDE) < demoTargetPowerWatts(0, TEST_RIDE));
 });
 
 test("demo speed solve slows uphill and speeds downhill at the same power", () => {
-  const flat = demoSpeedForPower(220, 0);
-  const climb = demoSpeedForPower(220, 8);
-  const descent = demoSpeedForPower(220, -5);
+  const flat = demoSpeedForPower(220, 0, TEST_RIDE);
+  const climb = demoSpeedForPower(220, 8, TEST_RIDE);
+  const descent = demoSpeedForPower(220, -5, TEST_RIDE);
 
   assert.ok(climb < flat, `${climb} kph should be slower than ${flat} kph`);
   assert.ok(descent > flat, `${descent} kph should be faster than ${flat} kph`);
@@ -28,7 +58,7 @@ test("demo heart rate settles near threshold HR at FTP power", () => {
   const originalRandom = Math.random;
   Math.random = () => 0.5;
   try {
-    const config = { ...DEMO_RIDE, flatPowerWatts: DEMO_RIDE.ftpWatts };
+    const config = { ...TEST_RIDE, flatPowerWatts: TEST_RIDE.ftpWatts };
     const model = createDemoRideModel(config);
 
     for (let i = 0; i < 240; i += 1) {
@@ -43,7 +73,7 @@ test("demo heart rate settles near threshold HR at FTP power", () => {
       });
     }
 
-    assert.ok(Math.abs(model.heartRateBpm - DEMO_RIDE.thresholdHeartRateBpm) <= 3);
+    assert.ok(Math.abs(model.heartRateBpm - TEST_RIDE.thresholdHeartRateBpm) <= 3);
   } finally {
     Math.random = originalRandom;
   }
@@ -54,7 +84,7 @@ test("demo heart rate publishes at most once a second", () => {
   let randomValue = 0.9;
   Math.random = () => randomValue;
   try {
-    const model = createDemoRideModel(DEMO_RIDE);
+    const model = createDemoRideModel(TEST_RIDE);
     advanceDemoRide(model, {
       elapsedSeconds: 1,
       gradePercent: 0,
@@ -81,7 +111,7 @@ test("demo heart rate publishes at most once a second", () => {
 });
 
 test("demo history can be seeded up to the current route position", () => {
-  const model = createDemoRideModel(DEMO_RIDE);
+  const model = createDemoRideModel(TEST_RIDE);
   const route = [
     { lat: 50, lng: 14, ele: 300, distance: 0 },
     { lat: 50.005, lng: 14.005, ele: 330, distance: 500 },

@@ -5,13 +5,13 @@
 
 import {
   computeRouteOverviewCamera,
-} from "./camera.mjs";
+} from "../camera/camera.mjs";
 import {
   densifyRoute,
   enrichRoute,
   parseGpx,
   routeTotalDistance,
-} from "./route.mjs";
+} from "../route/route.mjs";
 import {
   DEFAULT_MAP_FOV_DEGREES,
   GALLERY_PREVIEW_2D_ROUTE_WIDTH,
@@ -30,8 +30,8 @@ import {
   ROUTE_LINE_ALTITUDE_METERS,
   ROUTE_LINE_MAX_POINTS,
   ROUTE_LINE_SPACING_METERS,
-} from "./tuning.mjs";
-import { formatAltitude, formatDistance } from "./units.mjs";
+} from "../core/tuning.mjs";
+import { formatAltitude, formatDistance } from "../core/units.mjs";
 
 export const GALLERY_ATTRIBUTION = "satellite previews with optional Photorealistic 3D · map data © Google";
 

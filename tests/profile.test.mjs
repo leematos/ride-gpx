@@ -5,11 +5,8 @@ import {
   GRADE_PROFILE_COLORS,
   gradeColor,
   gradeColorZones,
-} from "../app/profile.mjs";
-import {
-  GRADE_METER_MAX_PERCENT,
-  GRADE_METER_MIN_PERCENT,
-} from "../app/tuning.mjs";
+} from "../app/route/profile.mjs";
+
 
 test("grade meter zones use the same thresholds as profile grade colors", () => {
   const zones = gradeColorZones(-30, 30);
@@ -28,7 +25,9 @@ test("grade meter zones use the same thresholds as profile grade colors", () => 
 });
 
 test("grade meter caps keep the outer color bands compact", () => {
-  const zones = gradeColorZones(GRADE_METER_MIN_PERCENT, GRADE_METER_MAX_PERCENT);
+  // Explicit caps (not the tuning values): the test pins the algorithm's
+  // band-clamping behavior at -6..10, whatever the app currently ships with.
+  const zones = gradeColorZones(-6, 10);
   assert.deepEqual(zones[0], {
     min: -6,
     max: -3,

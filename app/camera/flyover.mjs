@@ -1,6 +1,6 @@
 // Cinematic overview camera motion that is independent of route geometry.
 
-import { clamp, destinationPoint, toRad } from "./geo.mjs";
+import { clamp, destinationPoint, toRad } from "../core/geo.mjs";
 
 // Spin a static overview camera around its look-at point. `direction` is +1 for
 // clockwise, -1 for counter-clockwise; `secondsPerRevolution` sets the pace.

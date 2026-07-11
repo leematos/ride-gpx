@@ -1,7 +1,7 @@
-import { clamp, roundCoordinate } from "./geo.mjs";
-import { gradeAt, interpolateRoutePoint } from "./route.mjs";
-import { CYCLING_GROSS_EFFICIENCY, DEMO_RIDE } from "./tuning.mjs";
-import { activeCaloriesFromPower } from "./units.mjs";
+import { clamp, roundCoordinate } from "../core/geo.mjs";
+import { gradeAt, interpolateRoutePoint } from "../route/route.mjs";
+import { CYCLING_GROSS_EFFICIENCY, DEMO_RIDE } from "../core/tuning.mjs";
+import { activeCaloriesFromPower } from "../core/units.mjs";
 
 const GRAVITY = 9.80665;
 const KPH_PER_MPS = 3.6;

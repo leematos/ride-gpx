@@ -4,9 +4,9 @@
 // whole log via storage.mjs (IndexedDB) so a reload or crash never loses a
 // ride.
 
-import { roundCoordinate } from "./geo.mjs";
-import { readJson, removeStored, writeJson } from "./storage.mjs";
-import { RIDE_PERSIST_INTERVAL_MS, RIDE_SAMPLE_INTERVAL_MS } from "./tuning.mjs";
+import { roundCoordinate } from "../core/geo.mjs";
+import { readJson, removeStored, writeJson } from "../storage/storage.mjs";
+import { RIDE_PERSIST_INTERVAL_MS, RIDE_SAMPLE_INTERVAL_MS } from "../core/tuning.mjs";
 
 const RIDE_LOG_STORAGE_KEY = "gpx-rider:ride-log";
 

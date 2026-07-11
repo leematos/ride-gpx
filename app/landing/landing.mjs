@@ -11,9 +11,9 @@
 // Ported from the original Claude Design (x-dc) prototype to plain no-build JS:
 // every tunable now lives in LANDING_HERO (tuning.mjs) instead of design props,
 // and the route comes from landing-route.mjs instead of a global.
-import { LANDING_HERO as H } from "./tuning.mjs";
+import { LANDING_HERO as H } from "../core/tuning.mjs";
 import { LANDING_ROUTE_POINTS } from "./landing-route.mjs";
-import { deployedMapsApiKey } from "./config.mjs";
+import { deployedMapsApiKey } from "../config.mjs";
 
 const MAPS_API_KEY_STORAGE_KEY = "gpx-rider:maps-api-key";
 
