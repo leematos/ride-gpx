@@ -325,6 +325,68 @@ overview_motion:
     sample_count: 360
     start_angle_degrees: 0
 
+# --- Camera transition arcs (overview ↔ chase handoffs) -----------------------
+#
+# The flight the camera takes when it hands over between the route overview
+# and the rider chase camera (both directions): a physically-constrained
+# "missile POV" arc (app/camera/transition-arc.mjs) that matches the position
+# AND velocity of both endpoint cameras, looks along its own flight path
+# mid-flight, and banks into its turns. When no candidate duration can satisfy
+# the physical limits (or enabled is false) the handoff falls back to the
+# ordinary chase flight, exactly as before this feature existed.
+camera_transition:
+  enabled: true
+
+  # Candidate flight durations, in seconds: the solver scans from min upward
+  # in solver_step increments and flies the shortest duration whose curve
+  # passes every physical limit below. min is therefore the typical transition
+  # time; max only matters for awkward geometry (fast/opposed entry
+  # velocities), which sweeps wider, longer arcs before giving up.
+  min_duration_seconds: 3.5
+  max_duration_seconds: 12
+  solver_step_seconds: 0.5
+
+  # Scale-aware minimum turn radius: max(floor, fraction × straight-line
+  # distance). Short hops are "flown slower", so they may turn tighter — the
+  # limit is enforced as a lateral-acceleration cap of (distance/duration)² /
+  # radius, i.e. the full radius applies at cruise speed and shrinks with v²
+  # below it, the way a real turning aircraft's does. Raise the fraction for
+  # statelier, wider arcs; lower it to allow snappier turns.
+  min_turn_radius_floor_meters: 30
+  min_turn_radius_distance_fraction: 0.08
+
+  # Steepest climb/dive angle (degrees from horizontal) the flight tangent may
+  # reach. An overview sits high above the chase camera, so its dive is
+  # legitimately steep; below ~60 many overview→chase handoffs become
+  # unsolvable and fall back to the chase flight.
+  max_climb_angle_degrees: 75
+
+  # Loop-prevention guardrail from the Hermite fit: the velocity control
+  # offsets (velocity × duration/3) may not exceed this fraction of the
+  # straight-line distance, or the curve could fold back over itself. A
+  # candidate duration needing more is rejected (clamping would silently break
+  # the exact docking velocities).
+  velocity_clamp_distance_fraction: 0.5
+
+  # How much of the flight (fraction of normalized time, from each end) is
+  # used to sweep the view between the endpoint camera's real look direction
+  # and the mid-flight "look along the flight path" POV. Wider = gentler view
+  # rotation, narrower = more of the flight spent in pure missile POV.
+  lookat_blend_in_fraction: 0.25
+  lookat_blend_out_fraction: 0.35
+
+  # Roll applied when the arc turns hard: full bank exactly at the lateral-
+  # acceleration limit, proportionally less in gentler turns (same convention
+  # as the fly-by/fly-over modes: positive banks into a right turn).
+  max_bank_degrees: 25
+
+  # Samples along each candidate curve when checking the physical limits.
+  sample_count: 240
+
+  # Transitions shorter than this (meters between the two camera eyes) are not
+  # worth a flight — the ordinary chase flight handles them better.
+  min_distance_meters: 40
+
 # --- Finish-line orbit -------------------------------------------------------
 #
 # The instant a ride (pedaled, simulated, or demo) reaches the end of the

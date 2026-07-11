@@ -124,6 +124,10 @@ export const state = {
   overviewAnimLoopActive: false,
   cameraFlight: null,
   cameraFlightLoopActive: false,
+  // Live overview ↔ chase transition-arc flight ({ arc, startMs, onComplete },
+  // see camera/transition-camera.mjs); its loop owns the map camera while set.
+  cameraTransition: null,
+  cameraTransitionLoopActive: false,
   cameraZoom: DEFAULT_CAMERA_ZOOM,
   cameraAngleDegrees: DEFAULT_CAMERA_ANGLE_DEGREES,
   cameraBehindMeters: DEFAULT_CAMERA_BEHIND_METERS,
