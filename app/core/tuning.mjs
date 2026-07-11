@@ -105,6 +105,10 @@ export const DEFAULT_CLIMB_ORBIT_SECONDS_PER_REV = req("overview_motion", "climb
 export const CLIMB_ORBIT_SECONDS_PER_REV_MIN = req("overview_motion", "climb_orbit", "min_seconds_per_rev");
 export const CLIMB_ORBIT_SECONDS_PER_REV_MAX = req("overview_motion", "climb_orbit", "max_seconds_per_rev");
 
+// Camera transition arcs (overview ↔ chase handoffs); the whole config object
+// is passed to camera/transition-arc.mjs, like ELLIPSE_FLYBY.
+export const CAMERA_TRANSITION = req("camera_transition");
+
 // Finish-line orbit
 export const DEFAULT_FINISH_ORBIT_ENABLED = req("finish_orbit", "enabled");
 export const FINISH_ORBIT_RANGE_METERS = req("finish_orbit", "range_meters");

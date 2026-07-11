@@ -19,6 +19,7 @@ import {
   enterOverviewMode,
   returnToRiderCamera,
 } from "../camera/overview-camera.mjs";
+import { startCameraTransitionToFollow } from "../camera/transition-camera.mjs";
 import { saveRide, saveRideThrottled } from "../storage/persistence.mjs";
 import { renderProfile } from "../route/profile-ui.mjs";
 import { persistRideLog, recordRideTick } from "./recorder.mjs";
@@ -125,10 +126,16 @@ export function ensureMovementLoop() {
     }
     closeOverviewModeMenu();
     syncOverviewControls();
-    // Drop any animated-overview driver so it stops owning the camera and the
-    // follow flight (via updateMapCamera) can take over.
-    clearOverviewAnimation();
-    state.cameraMode = "follow";
+    // Hand the camera over once, on the actual overview→follow (or manual→
+    // follow) switch — via a physical transition arc when one fits (it
+    // captures the current driver's velocity before tearing that driver
+    // down), else by dropping the animated-overview driver so the follow
+    // flight (via updateMapCamera) can take over as before.
+    if (state.cameraMode !== "follow") {
+      const flying = startCameraTransitionToFollow();
+      state.cameraMode = "follow";
+      if (!flying) clearOverviewAnimation();
+    }
   }
   if (state.movementLoopActive) return;
   state.movementLoopActive = true;

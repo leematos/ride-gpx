@@ -53,11 +53,12 @@ import {
 export function updateMapCamera() {
   if (state.mapProvider !== "google3d" || !state.route.length || !state.map) return;
   if (state.userInteracting || state.cameraMode === "manual") return;
-  // An animated overview (orbit / fly-by / fly-over) writes the camera directly
-  // every frame from its own loop; the chase flight must yield or the two fight.
-  // This matters when the overview is kept up while riding — the movement loop
-  // would otherwise call stepCameraFlight here every tick.
-  if (state.overviewAnim) return;
+  // An animated overview (orbit / fly-by / fly-over) or a transition-arc
+  // flight writes the camera directly every frame from its own loop; the
+  // chase flight must yield or the two fight. This matters when the overview
+  // is kept up while riding — the movement loop would otherwise call
+  // stepCameraFlight here every tick.
+  if (state.overviewAnim || state.cameraTransition) return;
 
   const settled = stepCameraFlight(performance.now());
   // While the rider moves, the movement loop calls this every frame; when
@@ -78,8 +79,16 @@ function cameraFlightTarget() {
 }
 
 function followCameraTarget() {
-  const position = interpolateRoutePoint(state.route, state.progressMeters);
-  const heading = currentRouteHeading();
+  return followCameraTargetAt(state.progressMeters);
+}
+
+// The configured follow camera (or first-person eye) at an arbitrary route
+// progress — the transition arc asks for the pose where the rider *will* be.
+// Terrain lift is stateful time-based smoothing, so predicted targets skip it
+// (the chase re-applies it once it takes over from a docked transition).
+export function followCameraTargetAt(progressMeters, { terrainLift = true } = {}) {
+  const position = interpolateRoutePoint(state.route, progressMeters);
+  const heading = currentRouteHeading(progressMeters);
   if (isFirstPersonCameraView()) {
     return firstPersonCameraTarget(position, heading);
   }
@@ -103,7 +112,7 @@ function followCameraTarget() {
 
   let tilt = camera.tilt;
   let liftedCenterAltitude = centerAltitude;
-  const liftMeters = currentTerrainLift(camera, centerAltitude);
+  const liftMeters = terrainLift ? currentTerrainLift(camera, centerAltitude) : 0;
   if (liftMeters > 0) {
     const lifted = applyCameraLift({
       tiltDegrees: camera.tilt,
@@ -238,11 +247,11 @@ export function ensureCameraFlightLoop() {
     if (
       !state.route.length || !state.map || state.userInteracting ||
       state.movementLoopActive || state.cameraMode === "manual" ||
-      // An animated overview (orbit/flyby) owns the camera directly;
-      // the chase flight must yield or the two loops fight — the flight would
-      // re-init from the old pose and fly to the new route instead of the
-      // animation snapping to it.
-      state.overviewAnim
+      // An animated overview (orbit/flyby) or a transition-arc flight owns
+      // the camera directly; the chase flight must yield or the two loops
+      // fight — the flight would re-init from the old pose and fly to the
+      // new route instead of the animation snapping to it.
+      state.overviewAnim || state.cameraTransition
     ) {
       state.cameraFlightLoopActive = false;
       return;
@@ -261,7 +270,9 @@ export function ensureCameraFlightLoop() {
 
 // Jump the map straight to `camera` with no flight, and park the chase state
 // there (zero velocity) so the next target change starts a fresh smooth move.
+// A snap supersedes any transition-arc flight still in progress.
 export function applyCameraNow(camera) {
+  state.cameraTransition = null;
   state.map.center = { ...camera.center };
   state.map.heading = camera.heading;
   state.map.range = camera.range;
@@ -489,13 +500,13 @@ function captureManualCameraSettings() {
   updateCameraSettingsLabels();
 }
 
-export function currentRouteHeading() {
+export function currentRouteHeading(progressMeters = state.progressMeters) {
   if (state.route.length < 2) return 0;
   // Sample a short window around the rider so the camera points exactly the
   // way the rider is moving, rather than at a spot far up the road.
   const total = routeTotalDistance(state.route);
-  const from = interpolateRoutePoint(state.route, clamp(state.progressMeters - HEADING_SAMPLE_METERS, 0, total));
-  const to = interpolateRoutePoint(state.route, clamp(state.progressMeters + HEADING_SAMPLE_METERS, 0, total));
+  const from = interpolateRoutePoint(state.route, clamp(progressMeters - HEADING_SAMPLE_METERS, 0, total));
+  const to = interpolateRoutePoint(state.route, clamp(progressMeters + HEADING_SAMPLE_METERS, 0, total));
   return normalizeHeading(bearing(from, to));
 }
 
