@@ -221,7 +221,6 @@ The hosted application's Maps key is restricted to the GPX Rider domain. Self-ho
 - Calories are shown and exported only when the trainer reports FTMS Expended Energy.
 - Heart rate comes from a paired strap or, as a fallback, the trainer's own heart-rate field.
 - Terrain avoidance estimates ground height from route elevation rather than a separate Elevation API, so it works best where the route itself follows the hillside.
-- Test resistance changes at low speed and keep the bike and trainer area clear before a real workout.
 
 ## Tested hardware
 
