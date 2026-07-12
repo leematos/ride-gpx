@@ -5,6 +5,7 @@
 import { clamp } from "../core/geo.mjs";
 import { readJson, writeJson } from "../storage/storage.mjs";
 import { GRADE_INTERVAL_MAX_SECONDS, GRADE_INTERVAL_MIN_SECONDS } from "../core/tuning.mjs";
+import { connectFec, isFecConnected, resetFec, sendFecGrade, TACX_FEC_SERVICE } from "./trainer-fec.mjs";
 
 const FTMS_SERVICE = 0x1826;
 const FTMS_INDOOR_BIKE_DATA = 0x2ad2;
@@ -38,6 +39,7 @@ const TRAINER_STORAGE_KEY = "gpx-rider:last-trainer";
 
 const trainer = {
   device: null,
+  protocol: null, // "ftms" | "fec" — which backend owns the connected device
   controlPoint: null,
   bikeData: null,
   writeQueue: Promise.resolve(),
@@ -63,7 +65,7 @@ export function trainerDisplayName() {
 }
 
 export function isTrainerConnected() {
-  return Boolean(trainer.controlPoint);
+  return Boolean(trainer.controlPoint) || isFecConnected();
 }
 
 export async function connectTrainer() {
@@ -76,8 +78,13 @@ export async function connectTrainer() {
   try {
     callbacks.onStatus("Pairing");
     const device = await navigator.bluetooth.requestDevice({
-      filters: [{ services: [FTMS_SERVICE] }, { namePrefix: "KICKR" }],
-      optionalServices: [FTMS_SERVICE],
+      filters: [
+        { services: [FTMS_SERVICE] },
+        { services: [TACX_FEC_SERVICE] },
+        { namePrefix: "KICKR" },
+        { namePrefix: "Tacx" },
+      ],
+      optionalServices: [FTMS_SERVICE, TACX_FEC_SERVICE],
     });
 
     await connectTrainerDevice(device);
@@ -114,20 +121,50 @@ export async function reconnectSavedTrainer() {
 }
 
 async function connectTrainerDevice(device) {
-  trainer.device = null;
-  trainer.controlPoint = null;
-  trainer.bikeData = null;
-  trainer.writeQueue = Promise.resolve();
-  device.addEventListener("gattserverdisconnected", () => {
-    trainer.device = null;
-    trainer.controlPoint = null;
-    trainer.bikeData = null;
-    trainer.writeQueue = Promise.resolve();
-    callbacks.onTelemetry(null);
-    callbacks.onStatus("Disconnected");
+  resetTrainerConnection();
+  device.addEventListener("gattserverdisconnected", handleTrainerDisconnected);
+
+  // FTMS first (KICKR and other standards-compliant trainers); fall back to
+  // Tacx FE-C for the wheel-on Tacx units that never got FTMS firmware. The
+  // paired device exposes exactly one of the two control protocols.
+  const ftmsService = await getPrimaryServiceWithRetry(device, FTMS_SERVICE, "trainer", { optional: true });
+  if (ftmsService) {
+    await connectFtms(ftmsService);
+    trainer.protocol = "ftms";
+  } else {
+    const fecService = await getPrimaryServiceWithRetry(device, TACX_FEC_SERVICE, "trainer", { optional: true });
+    if (!fecService) {
+      throw new Error("This trainer exposes neither FTMS nor Tacx FE-C over Bluetooth.");
+    }
+    await connectFec(fecService, {
+      onTelemetry: callbacks.onTelemetry,
+      onStatus: callbacks.onStatus,
+      displayName: device.name || "Tacx",
+    });
+    trainer.protocol = "fec";
+  }
+
+  trainer.device = device;
+  writeJson(TRAINER_STORAGE_KEY, {
+    id: device.id,
+    name: device.name || (trainer.protocol === "fec" ? "Tacx" : "KICKR"),
+    savedAt: new Date().toISOString(),
   });
 
-  const service = await getPrimaryServiceWithRetry(device, FTMS_SERVICE, "trainer");
+  if (trainer.protocol === "ftms") {
+    await sendTrainerCommand(OP_REQUEST_CONTROL);
+
+    // Clears any stale ERG/resistance target left over from a previous
+    // session (Zwift, TrainerRoad, etc.) — some trainers keep enforcing that
+    // target and silently ignore Set Simulation Parameters until reset.
+    await sendTrainerCommand(OP_RESET);
+  }
+  // FE-C trainers accept Track Resistance directly — no control handshake.
+
+  callbacks.onStatus(device.name || "Connected");
+}
+
+async function connectFtms(service) {
   trainer.controlPoint = await service.getCharacteristic(FTMS_CONTROL_POINT);
   await subscribeToControlPointResponses();
   await subscribeToBikeData(service);
@@ -138,28 +175,30 @@ async function connectTrainerDevice(device) {
   } catch {
     // Some trainers expose indications only on the control point.
   }
-
-  trainer.device = device;
-  writeJson(TRAINER_STORAGE_KEY, {
-    id: device.id,
-    name: device.name || "KICKR",
-    savedAt: new Date().toISOString(),
-  });
-  await sendTrainerCommand(OP_REQUEST_CONTROL);
-
-  // Clears any stale ERG/resistance target left over from a previous
-  // session (Zwift, TrainerRoad, etc.) — some trainers keep enforcing that
-  // target and silently ignore Set Simulation Parameters until reset.
-  await sendTrainerCommand(OP_RESET);
-
-  callbacks.onStatus(device.name || "Connected");
 }
 
-async function getPrimaryServiceWithRetry(device, serviceUuid, label) {
+function resetTrainerConnection() {
+  trainer.device = null;
+  trainer.protocol = null;
+  trainer.controlPoint = null;
+  trainer.bikeData = null;
+  trainer.writeQueue = Promise.resolve();
+  resetFec();
+}
+
+function handleTrainerDisconnected() {
+  resetTrainerConnection();
+  callbacks.onTelemetry(null);
+  callbacks.onStatus("Disconnected");
+}
+
+async function getPrimaryServiceWithRetry(device, serviceUuid, label, { optional = false } = {}) {
   try {
     const server = await connectGatt(device);
     return await server.getPrimaryService(serviceUuid);
   } catch (error) {
+    // An absent optional service is a normal detection outcome, not a failure.
+    if (optional && isServiceNotFoundError(error)) return null;
     if (!isGattDisconnectedError(error)) throw error;
 
     console.warn(`GATT disconnected while discovering ${label}; reconnecting once.`, error);
@@ -170,9 +209,18 @@ async function getPrimaryServiceWithRetry(device, serviceUuid, label) {
       // Some browsers throw if already disconnected; connecting below is enough.
     }
     await delay(GATT_RECONNECT_DELAY_MS);
-    const server = await connectGatt(device);
-    return await server.getPrimaryService(serviceUuid);
+    try {
+      const server = await connectGatt(device);
+      return await server.getPrimaryService(serviceUuid);
+    } catch (retryError) {
+      if (optional && isServiceNotFoundError(retryError)) return null;
+      throw retryError;
+    }
   }
+}
+
+function isServiceNotFoundError(error) {
+  return error?.name === "NotFoundError" || /No Services matching|not found/i.test(error?.message || "");
 }
 
 async function connectGatt(device) {
@@ -302,6 +350,12 @@ export function queueTrainerGradeSample(gradePercent, { force = false, intervalS
 }
 
 export async function sendTrainerGrade(gradePercent) {
+  // Tacx FE-C trainers take the grade as a Track Resistance page instead of an
+  // FTMS Set Simulation write; the FE-C backend owns its own dedupe/queue.
+  if (trainer.protocol === "fec") {
+    await sendFecGrade(gradePercent);
+    return;
+  }
   if (!trainer.controlPoint) return;
 
   // Never let a slow write build a backlog: if one is still in flight, skip
