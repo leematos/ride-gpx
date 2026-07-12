@@ -8,7 +8,8 @@
 // `camera_transition.arc_into_modes` in tuning.yaml): the follow (rider) camera
 // — for the overview-off / movement-start handoff and the elevation-profile
 // teleport — docking where the rider *will* be; and the fly-by / fly-over
-// patterns, docking onto the pattern point nearest the camera. Static / orbit /
+// patterns, docking where the current line of sight, pitched to the configured
+// climb angle, meets the pattern. Static / orbit /
 // satellite overviews are never arced into — they snap or ease through their
 // own driver. Each entry point returns false when no physically-valid arc
 // exists (or the target isn't an arc mode), and the caller keeps its
@@ -74,10 +75,16 @@ export function startCameraTransitionToFollow(startState = null) {
 }
 
 // Fly from wherever the camera is onto a fly-by / fly-over pattern — a natural
-// continuous flight, so an arc into it reads as one motion. It docks at the
-// pattern point nearest the current camera, matching that point's velocity,
-// bank and FOV, then hands off to the pattern animation entering exactly there
-// (no intro ease — the arc already delivered that frame). Returns false (caller
+// continuous flight, so an arc into it reads as one motion. The entry point is
+// the joinable pattern point needing the least head-turn from the current line
+// of sight — no steeper than `fly_entry_climb_degrees` and never where the
+// pattern flies back at the camera (see `entrySForView` in flyby.mjs) — so the
+// camera climbs away ahead of the rider instead of bolting for the pattern
+// point straight overhead (the pattern flies high, so the *nearest* point
+// forces a contorted joining arc). The arc docks there matching that point's
+// velocity, bank and
+// FOV, then hands off to the pattern animation entering exactly there (no
+// intro ease — the arc already delivered that frame). Returns false (caller
 // keeps the eased pattern entry) when the route is too small to fly, this mode
 // isn't an arc target, or no physically-valid arc fits.
 export function startCameraTransitionToFlyPattern(startState, mode) {
@@ -90,7 +97,7 @@ export function startCameraTransitionToFlyPattern(startState, mode) {
   const start = startState ?? captureCameraTransitionStart();
   if (!start) return false;
 
-  const enterS = pattern.nearestSTo(start.eye);
+  const enterS = pattern.entrySForView(start.eye, start.lookAt, CAMERA_TRANSITION.fly_entry_climb_degrees);
   const dock = flyPatternDockState(pattern, enterS);
   if (!dock) return false;
 

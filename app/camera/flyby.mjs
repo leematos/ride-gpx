@@ -16,6 +16,12 @@ const EARTH_RADIUS_METERS = 6371000;
 const METERS_PER_DEGREE = EARTH_RADIUS_METERS * Math.PI / 180;
 const TWO_PI = Math.PI * 2;
 
+// Entry candidates (entrySForView) whose bearing is within this band of the
+// least-head-turn one count as equally "in view" — it absorbs the sampling
+// noise around a sight-line crossing so the natural-climb preference can
+// choose among them, without letting a meaningfully different bearing win.
+const ENTRY_BEARING_BAND_RADIANS = 2 * Math.PI / 180;
+
 export function createEllipseFlyby(route, config = {}) {
   return buildLoopFlight(fitFlybyEllipse(route, config), config);
 }
@@ -147,19 +153,86 @@ function buildLoopFlight(curve, config = {}) {
     const lat = Number(target?.lat);
     const lng = Number(target?.lng);
     if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 0;
+    // Longitude degrees shrink with latitude — weight them so the comparison
+    // is metric, not skewed toward north-south separation.
+    const cosLat = Math.cos(toRad(lat)) || 1e-6;
     const count = 180;
     let bestS = 0;
     let bestDistance = Infinity;
     for (let i = 0; i < count; i++) {
       const s = (i / count) * curve.loopLength;
       const eye = frameAt(s).eye;
-      const d = (eye.lat - lat) ** 2 + (eye.lng - lng) ** 2;
+      const d = (eye.lat - lat) ** 2 + ((eye.lng - lng) * cosLat) ** 2;
       if (d < bestDistance) {
         bestDistance = d;
         bestS = s;
       }
     }
     return bestS;
+  }
+
+  // Arc-length of the dock point for a flight joining the pattern from a
+  // viewer at `eye` looking toward `lookAt`. A candidate entry must be
+  // joinable without drama: no steeper than `climbDegrees` up from the
+  // horizon (in the extreme the loop edge is straight overhead — the exact
+  // entry this function exists to avoid), and with the pattern's travel
+  // direction not opposed to the approach (the pattern is a directed flight;
+  // docking where it heads back at the viewer would whip the camera around).
+  // Among those, the entry needing the least head-turn from the current line
+  // of sight wins — a crossing dead ahead when the viewer faces the pattern,
+  // else the first qualifying point that comes into view turning toward it —
+  // and within that bearing, the point whose distance best matches raising
+  // the view by `climbDegrees` to the pattern's flight altitude. Falls back
+  // to the point nearest that raised aim when nothing qualifies, and to
+  // nearestSTo(eye) when the geometry is degenerate (no horizontal view
+  // direction, or the viewer is already at the pattern's altitude).
+  function entrySForView(eye, lookAt, climbDegrees) {
+    const lat = Number(eye?.lat);
+    const lng = Number(eye?.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return 0;
+    const cosLat = Math.cos(toRad(lat)) || 1e-6;
+    const east = (Number(lookAt?.lng) - lng) * METERS_PER_DEGREE * cosLat;
+    const north = (Number(lookAt?.lat) - lat) * METERS_PER_DEGREE;
+    const horizontal = Math.hypot(east, north);
+    const climb = Math.tan(toRad(clamp(Number(climbDegrees) || 45, 5, 85)));
+    const patternAltitude = curve.centerAltitude + flyHeight;
+    const forward = Math.abs(patternAltitude - (Number(eye.altitude) || 0)) / climb;
+    if (!(horizontal > 1e-6) || !(forward > 1)) return nearestSTo(eye);
+    const dirEast = east / horizontal;
+    const dirNorth = north / horizontal;
+
+    const count = 360;
+    const candidates = [];
+    for (let i = 0; i < count; i++) {
+      const s = (i / count) * curve.loopLength;
+      const point = frameAt(s).eye;
+      const de = (point.lng - lng) * METERS_PER_DEGREE * cosLat;
+      const dn = (point.lat - lat) * METERS_PER_DEGREE;
+      const distance = Math.hypot(de, dn);
+      if (distance < forward) continue; // steeper than the natural climb
+      const [tangentEast, tangentNorth] = tangentAt(s);
+      if (tangentEast * de + tangentNorth * dn <= 0) continue; // pattern heads back at the viewer
+      const deviation = Math.acos(clamp((de * dirEast + dn * dirNorth) / distance, -1, 1));
+      candidates.push({ s, deviation, distance });
+    }
+    if (!candidates.length) {
+      return nearestSTo({
+        lat: lat + (dirNorth * forward) / METERS_PER_DEGREE,
+        lng: lng + (dirEast * forward) / (METERS_PER_DEGREE * cosLat),
+      });
+    }
+    // Least head-turn wins; within one bearing band of it (sampling noise
+    // around a crossing), the distance closest to the natural climb point.
+    let minDeviation = Infinity;
+    for (const candidate of candidates) minDeviation = Math.min(minDeviation, candidate.deviation);
+    let best = null;
+    for (const candidate of candidates) {
+      if (candidate.deviation > minDeviation + ENTRY_BEARING_BAND_RADIANS) continue;
+      if (!best || Math.abs(candidate.distance - forward) < Math.abs(best.distance - forward)) {
+        best = candidate;
+      }
+    }
+    return best.s;
   }
 
   return {
@@ -186,6 +259,7 @@ function buildLoopFlight(curve, config = {}) {
       return wrap((Number(s) || 0) + speedMps * dt, curve.loopLength);
     },
     nearestSTo,
+    entrySForView,
     frameAt,
   };
 }

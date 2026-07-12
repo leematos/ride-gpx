@@ -39,6 +39,7 @@ import {
 } from "../map/route-render.mjs";
 import { els, state } from "../core/state.mjs";
 import {
+  CAMERA_TRANSITION,
   DEFAULT_FINISH_ORBIT_ENABLED,
   DEFAULT_MAP_FOV_DEGREES,
   ELLIPSE_FLYBY,
@@ -278,10 +279,15 @@ export function startOverviewAnimation({ instant = false, atS = null } = {}) {
   // load can be on the far side of the world — no sensible lerp) or an arc just
   // docked onto the pattern (it already delivered the entry frame).
   const introFrom = instant || enteringFromArc ? null : currentMapCameraPose();
-  // Enter a fly pattern at the arc-length the docking arc delivered, else at the
-  // point nearest the current camera, so the flight takes the short way in
-  // instead of always flying to the pattern's start.
-  const startS = enteringFromArc ? atS : (flyby && introFrom?.eye ? flyby.nearestSTo(introFrom.eye) : 0);
+  // Enter a fly pattern at the arc-length the docking arc delivered, else where
+  // the current line of sight meets the pattern at a natural climb angle (the
+  // same entry the transition arc targets, so the eased fallback joins the
+  // pattern at the same kind of point instead of the one straight overhead).
+  const startS = enteringFromArc
+    ? atS
+    : (flyby && introFrom?.eye
+      ? flyby.entrySForView(introFrom.eye, introFrom.center, CAMERA_TRANSITION.fly_entry_climb_degrees)
+      : 0);
   state.overviewAnim = {
     mode,
     flyby,

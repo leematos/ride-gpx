@@ -606,12 +606,20 @@ in place).
     `seekToMeters` in `movement.mjs`, guarded to skip while moving, in an
     overview, or in manual mode). The dock is where the rider *will* be.
   - **fly-by / fly-over** — arced into from any camera when the mode is
-    selected (`startCameraTransitionToFlyPattern`): the arc docks at the
-    pattern point nearest the current camera (`nearestSTo`) with that point's
+    selected (`startCameraTransitionToFlyPattern`): the entry is the joinable
+    pattern point needing the least head-turn from the current line of sight
+    (`entrySForView` in `flyby.mjs`) — joinable meaning no steeper than
+    `fly_entry_climb_degrees` (default 45°) up from the horizon and never
+    where the directed pattern flies back at the camera. A camera facing the
+    pattern docks at the sight-line crossing dead ahead; one facing away
+    docks at the first qualifying point that comes into view turning toward
+    it. The plain *nearest* pattern point is usually almost straight overhead
+    and forced a contorted joining arc. The arc docks there with that point's
     velocity, bank and FOV, then hands off to the pattern animation entering
     at exactly that arc-length (`startOverviewAnimation({ atS })`, no intro
-    ease). Falls back to the eased pattern entry when no arc fits (already on
-    the pattern, too steep a climb, etc.).
+    ease); the eased (non-arc) pattern entry enters at the same point. Falls
+    back to the eased pattern entry when no arc fits (already on the pattern,
+    too steep a climb, etc.).
   - **static / orbit / satellite** (whole-route, climb-focus, and finish-line
     alike) — **never** arced into. They're artificial framings (a held frame
     or a turntable), so an arc into them reads as two stitched motions; they

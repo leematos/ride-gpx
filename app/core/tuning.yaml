@@ -350,12 +350,24 @@ camera_transition:
   # Remove a mode here to fall its transitions back to the plain chase/eased entry.
   arc_into_modes: ["follow", "flyby", "flyover"]
 
+  # Where an arc into a fly-by / fly-over pattern docks. A joinable entry must
+  # be no steeper than this many degrees up from the horizon (the plain
+  # nearest pattern point is usually almost straight overhead, which forced a
+  # contorted joining arc) and must not oppose the pattern's travel direction
+  # (the pattern is a directed flight — docking where it heads back at the
+  # camera would whip the view around). Among joinable entries, the one
+  # needing the least head-turn from the current line of sight wins: a
+  # crossing dead ahead when the camera faces the pattern, else the first
+  # qualifying point that comes into view turning toward it. Steeper = allows
+  # entries closer to overhead; shallower = pushes entries further out.
+  fly_entry_climb_degrees: 45
+
   # Candidate flight durations, in seconds: the solver scans from min upward
   # in solver_step increments and flies the shortest duration whose curve
   # passes every physical limit below. min is therefore the typical transition
   # time; max only matters for awkward geometry (fast/opposed entry
   # velocities), which sweeps wider, longer arcs before giving up.
-  min_duration_seconds: 3.5
+  min_duration_seconds: 7
   max_duration_seconds: 12
   solver_step_seconds: 0.5
 

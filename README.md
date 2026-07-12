@@ -106,7 +106,7 @@ Selecting a detected climb or custom segment opens a dedicated static, orbit, or
 
 - Overview-to-rider, rider-to-overview, and movement-start handoffs are flown rather than cut.
 - The camera intercepts a moving rider where it will be when the flight finishes, rather than chasing its old position.
-- Entering Orbit docks into the rotation already in progress; the orbit then resumes at the same pose and angular speed.
+- Entering Fly-by or Fly-over joins the pattern at the point needing the least turn of the current view — ahead along the line of sight at a natural climb angle, never where the pattern flies back at the camera; the pattern then continues from that exact point.
 - Position, view direction, roll, field of view, and velocity continue through the dock without a separate alignment phase.
 - Geometry that cannot satisfy the configured physical limits falls back to the classic chase flight.
 
@@ -139,7 +139,7 @@ GPX Rider is deliberately engineered as a small, inspectable static application 
 The camera system uses purpose-built geometry rather than canned animations:
 
 - **Time-scaled cubic Hermite splines** fly the camera onto a continuously-moving target in a local east/north/up frame, executed as cubic Béziers whose control offsets encode the endpoint velocities. The arc is used only where docking with matching velocity reads as one motion — flying back to the rider (leaving an overview, starting to move, teleporting via the elevation profile) and flying onto the Fly-by / Fly-over pattern. Artificial framings (static, orbit, satellite) snap or ease through their own driver, and a camera reset eases the plain chase home. Which targets get the arc is a single tunable list.
-- **Exact position-and-velocity docking** makes both ends of a flight continuous: the chase camera inherits the arc's terminal velocity so follow tracking picks up without a restart, and an arc onto a Fly-by/Fly-over pattern docks at the pattern point nearest the camera and hands off at that exact arc-length.
+- **Exact position-and-velocity docking** makes both ends of a flight continuous: the chase camera inherits the arc's terminal velocity so follow tracking picks up without a restart, and an arc onto a Fly-by/Fly-over pattern docks at the direction-aligned pattern point needing the least view turn — ahead along the line of sight at a natural climb angle — handing off at that exact arc-length.
 - **Dual-arc, tangent POV** flies the camera eye on the Hermite path while looking strictly along its flight tangent mid-arc. Near each dock, Rodrigues rotation turns the view direction at a constant rate into the real endpoint view—never through independent heading and tilt interpolation.
 - **Moving-target interception** solves the rider's future follow-camera pose for each candidate flight duration instead of aiming where the rider was when the transition began.
 - **Centripetal banking** derives roll from the path's lateral acceleration, producing aircraft-like banking into turns.
