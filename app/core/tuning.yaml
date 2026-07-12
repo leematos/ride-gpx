@@ -492,7 +492,7 @@ terrain_avoidance:
 # elevation, plus online tiles when enabled), and eases in/out like the lift.
 # NOT applied in any other camera mode (overview / orbit / fly / transition).
 rider_visibility:
-  enabled: true
+  enabled: false
 
   # Search up to this many degrees each way for a clear line of sight, in these
   # steps. Wider max lets the camera swing further around a big hill; a finer
