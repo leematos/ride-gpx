@@ -201,6 +201,121 @@ test("bank is strongest at the tightest turn", () => {
   assert.ok(tight <= BASE.max_bank_degrees + 1e-6);
 });
 
+test("nearestSTo picks the metrically nearest pattern point", () => {
+  const flyby = createEllipseFlyby(route, BASE);
+  for (const ratio of [0.05, 0.3, 0.62, 0.9]) {
+    const anchor = flyby.frameAt(flyby.loopLength * ratio).eye;
+    const probe = { lat: anchor.lat + 0.002, lng: anchor.lng + 0.004 };
+    const probeLocal = toLocalEN(probe);
+
+    // Brute-force the true nearest eye in local meters.
+    let bestDistance = Infinity;
+    for (let i = 0; i < 720; i++) {
+      const eye = toLocalEN(flyby.frameAt(flyby.loopLength * (i / 720)).eye);
+      bestDistance = Math.min(bestDistance, Math.hypot(eye.e - probeLocal.e, eye.n - probeLocal.n));
+    }
+
+    const chosen = toLocalEN(flyby.frameAt(flyby.nearestSTo(probe)).eye);
+    const chosenDistance = Math.hypot(chosen.e - probeLocal.e, chosen.n - probeLocal.n);
+    assert.ok(
+      chosenDistance <= bestDistance + flyby.loopLength / 90,
+      `within one sample step of the true nearest (${chosenDistance} vs ${bestDistance})`,
+    );
+  }
+});
+
+test("entrySForView docks ahead along the view direction, not overhead", () => {
+  const flyby = createEllipseFlyby(route, BASE);
+  // A ground-level viewer directly under the pattern's westmost point, looking
+  // due east across the route. The *nearest* pattern point is straight
+  // overhead; the view-ray entry must instead sit ahead, at a natural climb.
+  let westS = 0;
+  let westLng = Infinity;
+  for (let i = 0; i < 360; i++) {
+    const s = flyby.loopLength * (i / 360);
+    const lng = flyby.frameAt(s).eye.lng;
+    if (lng < westLng) {
+      westLng = lng;
+      westS = s;
+    }
+  }
+  const under = flyby.frameAt(westS).eye;
+  const viewer = { lat: under.lat, lng: under.lng, altitude: flyby.curve.centerAltitude };
+  const lookAt = { lat: under.lat, lng: under.lng + 0.01, altitude: viewer.altitude };
+
+  const entryS = flyby.entrySForView(viewer, lookAt, 45);
+  const dock = toLocalEN(flyby.frameAt(entryS).eye);
+  const viewerLocal = toLocalEN(viewer);
+  const forward = { e: dock.e - viewerLocal.e, n: dock.n - viewerLocal.n };
+  const horizontal = Math.hypot(forward.e, forward.n);
+  const climbDegrees = Math.atan2(flyby.flyHeightMeters, horizontal) * 180 / Math.PI;
+
+  assert.ok(forward.e > 0, "the dock sits in the half-plane the viewer is facing");
+  const offBearingDegrees = Math.abs(Math.atan2(forward.n, forward.e)) * 180 / Math.PI;
+  assert.ok(offBearingDegrees < 5, `the dock sits on the line of sight (${offBearingDegrees}° off)`);
+  assert.ok(climbDegrees <= 45.5, `the climb to the dock is natural or shallower (${climbDegrees}°)`);
+  const overheadDock = toLocalEN(flyby.frameAt(flyby.nearestSTo(viewer)).eye);
+  assert.ok(
+    Math.hypot(dock.e - overheadDock.e, dock.n - overheadDock.n) > 100,
+    "the entry differs from the plain nearest (overhead) point",
+  );
+});
+
+test("entrySForView respects the pattern's travel direction at the dock", () => {
+  for (const direction of [1, -1]) {
+    const flyby = createEllipseFlyby(route, { ...BASE, direction });
+    const center = flyby.curve.toGeo([...flyby.curve.center, 0]);
+    const viewer = { lat: center.lat, lng: center.lng, altitude: flyby.curve.centerAltitude };
+    const lookAt = { lat: center.lat, lng: center.lng + 0.01, altitude: viewer.altitude };
+    const s = flyby.entrySForView(viewer, lookAt, 45);
+    const dockLocal = toLocalEN(flyby.frameAt(s).eye);
+    const viewerLocal = toLocalEN(viewer);
+    const approach = { e: dockLocal.e - viewerLocal.e, n: dockLocal.n - viewerLocal.n };
+    const p0 = flyby.positionAt(s);
+    const p1 = flyby.positionAt(s + 5);
+    assert.ok(
+      approach.e * (p1[0] - p0[0]) + approach.n * (p1[1] - p0[1]) > 0,
+      `direction ${direction}: the pattern moves away from the viewer at the dock`,
+    );
+  }
+});
+
+test("entrySForView turns toward the pattern when looking away from it", () => {
+  const flyby = createEllipseFlyby(route, BASE);
+  // A viewer well outside the pattern's east end, looking further east — the
+  // whole pattern is behind. The entry must still be a joinable point: no
+  // steeper than the natural climb, with the pattern moving away at the dock.
+  let eastLng = -Infinity;
+  for (let i = 0; i < 360; i++) {
+    eastLng = Math.max(eastLng, flyby.frameAt(flyby.loopLength * (i / 360)).eye.lng);
+  }
+  const viewer = { lat: route[0].lat, lng: eastLng + 0.02, altitude: flyby.curve.centerAltitude };
+  const lookAt = { lat: viewer.lat, lng: viewer.lng + 0.05, altitude: viewer.altitude };
+  const s = flyby.entrySForView(viewer, lookAt, 45);
+  const dockLocal = toLocalEN(flyby.frameAt(s).eye);
+  const viewerLocal = toLocalEN(viewer);
+  const approach = { e: dockLocal.e - viewerLocal.e, n: dockLocal.n - viewerLocal.n };
+  const horizontal = Math.hypot(approach.e, approach.n);
+  const climbDegrees = Math.atan2(flyby.flyHeightMeters, horizontal) * 180 / Math.PI;
+  assert.ok(climbDegrees <= 45.5, `the climb to the dock is natural or shallower (${climbDegrees}°)`);
+  const p0 = flyby.positionAt(s);
+  const p1 = flyby.positionAt(s + 5);
+  assert.ok(
+    approach.e * (p1[0] - p0[0]) + approach.n * (p1[1] - p0[1]) > 0,
+    "the pattern moves away from the viewer at the dock",
+  );
+});
+
+test("entrySForView falls back to the nearest point without a view direction", () => {
+  const flyby = createEllipseFlyby(route, BASE);
+  const under = flyby.frameAt(flyby.loopLength * 0.4).eye;
+  const viewer = { lat: under.lat, lng: under.lng, altitude: 0 };
+  assert.equal(flyby.entrySForView(viewer, viewer, 45), flyby.nearestSTo(viewer));
+
+  const flyover = createFigureEightFlyover(route, BASE);
+  assert.equal(typeof flyover.entrySForView, "function", "the shared driver exposes it for fly-over too");
+});
+
 test("figure-eight fly-over returns null for routes too small to fly", () => {
   assert.equal(createFigureEightFlyover([{ lat: 46, lng: 7, ele: 0 }], BASE), null);
 });
