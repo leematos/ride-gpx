@@ -46,7 +46,7 @@ pages, `styles.css`, `gallery.json`, and `assets/` stay at the app root.
 | `app/camera/` | Camera behavior | `camera.mjs` (pure follow-camera math; tested), `flyover.mjs` (pure orbit math; tested), `flyby.mjs` (pure ellipse/figure-eight flight math; tested), `follow-camera.mjs` (follow/first-person targets, chase flight, terrain avoidance, manual-drag capture), `overview-camera.mjs` (overview state machine: static/satellite framing, animated orbit/fly-by/fly-over, finish orbit, return-to-rider), `camera-ui.mjs` (map action-bar camera controls + menus, camera settings sliders, first-person preset, reset button state), `camera-debug.mjs` (debug overlay readout + red travel-path debug line), `transition-arc.mjs` (pure overview ↔ chase transition-arc math: Hermite/Bezier eye + look-at flight, duration solver against scale-aware physical limits; tested), `transition-camera.mjs` (app-side transition driver: captures pose + driver velocity, predicts the dock state, flies the arc into whichever target is in `arc_into_modes` — the follow camera (overview-off, movement-start, profile-seek teleport) or the fly-by/fly-over pattern; static/orbit/satellite overviews are never arced into) |
 | `app/route/` | Route processing | `route.mjs` (GPX parsing, enrichment, interpolation, grade; tested), `climb-signal.mjs` (pure resample/smooth/rolling-grade elevation-signal helpers behind climb detection; tested), `climbs.mjs` (sustained-climb detection — the fatigue-pressure state machine built on `climb-signal.mjs`; tested), `difficulty.mjs` (classification from distance + gain; tested), `route-load.mjs` (GPX file/URL intake, `applyGpxText` route-swap sequence, once-per-load route overview), `climbs-ui.mjs` (climb/segment focus, live climb status, the HUD climb/segment banner), `profile.mjs` (elevation profile canvas drawing + hit-testing), `profile-ui.mjs` (profile rendering + hover/seek/drag-select wiring) |
 | `app/ride/` | Ride execution & telemetry | `movement.mjs` (the movement loop `tick`, simulation toggle, pedaling hysteresis, reset, seek), `eta.mjs` (flat-equivalent pace ETA model; tested), `ride-ui.mjs` (`updateRideUi`, the per-tick UI driver), `telemetry-ui.mjs` (trainer/HR callbacks, HR source resolution, calories/timer, telemetry readouts), `training-zones.mjs` (HR/power zones, fullscreen zone meters, zone summaries), `recorder.mjs` (ride sample bucket), `recording-ui.mjs` (FIT card, download, clear), `fit.mjs` (FIT encoder — must stay sport=cycling, sub_sport=virtual_activity; tested) |
-| `app/trainer/` | Hardware | `trainer.mjs` (FTMS over Web Bluetooth: pairing, reconnect, write queue, Indoor Bike Data), `heartrate.mjs` (BLE heart-rate strap, service 0x180D) |
+| `app/trainer/` | Hardware | `trainer.mjs` (trainer pairing + reconnect + protocol detection; FTMS over Web Bluetooth: write queue, Indoor Bike Data; routes to the FE-C backend for Tacx), `trainer-fec.mjs` (Tacx FE-C over BLE backend: telemetry notifications + Track Resistance grade writes on service 6e40fec1), `fec.mjs` (pure ANT+ FE-C codec: ANT framing + page 16/25/51 encode/decode — tested), `heartrate.mjs` (BLE heart-rate strap, service 0x180D) |
 | `app/settings/` | Settings | `settings-ui.mjs` (settings dialog shell + every non-camera panel: units, rider profile, display & HUD toggles, rendering, screenshot settings) |
 | `app/storage/` | Storage & persistence | `storage.mjs` (IndexedDB behind a sync cache, localStorage fallback + migration; tested), `persistence.mjs` (`restoreSettings`/`saveSettings`, `restoreSavedRide`/`saveRide` — the one deliberately cross-cutting module) |
 | `app/hud/` | Shared HUD layout | `screen-manager.mjs` (**the central HUD layout manager** — see "Map HUD layout" below), `map-hud.mjs` (clock chip, HUD tile order/visibility + drag-reorder, tile layout, dock collapse, fullscreen enter/exit, map screenshot action), `theater-mode.mjs` (exact-size recording viewport) |
@@ -73,11 +73,12 @@ do NOT change the layer rules — a pure module stays pure wherever it lives:
 2. **Pure logic modules** (`core/geo`, `camera/camera`, `route/route`,
    `ride/eta`, `route/difficulty`, `route/climbs`, `core/units`, `ride/fit`,
    `camera/flyby`, `camera/flyover`, `demo/demo`, `map/route-style`,
-   `route/profile`) — no DOM, no app state, no imports from higher layers.
-   Every one of these is unit-testable; most are tested.
-3. **Hardware/IO modules** (`trainer/trainer`, `trainer/heartrate`,
-   `ride/recorder`, `storage/storage`, `map/screenshot`) — own their internal
-   state, talk upward only through `init*()` callbacks or return values.
+   `route/profile`, `trainer/fec`) — no DOM, no app state, no imports from
+   higher layers. Every one of these is unit-testable; most are tested.
+3. **Hardware/IO modules** (`trainer/trainer`, `trainer/trainer-fec`,
+   `trainer/heartrate`, `ride/recorder`, `storage/storage`, `map/screenshot`) —
+   own their internal state, talk upward only through `init*()` callbacks or
+   return values.
 4. **`core/state.mjs`** — the shared mutable `state` object + the `els` DOM
    map + `updateProgressLabel`. It may import only layers 1–3 (in practice:
    `tuning.mjs` and `eta.mjs`). **Never add functions or feature logic here,
@@ -412,6 +413,26 @@ in place).
 - **BLE**: FTMS control-point writes must go through the write queue in
   `trainer.mjs` (one GATT operation at a time) and grade writes are
   throttled/averaged — read the comments there before changing timing.
+- **Two trainer protocols.** `trainer.mjs` pairs and reconnects for both, then
+  detects at connect time which control service the chosen device exposes and
+  routes to a backend: **FTMS** (`0x1826`, handled inline in `trainer.mjs` —
+  KICKR-class trainers) or **Tacx FE-C over BLE** (`6e40fec1`, handled by
+  `trainer-fec.mjs` — the wheel-on Flow/Vortex/Bushido/Genius, which never got
+  FTMS firmware). The public API (`connectTrainer`, `queueTrainerGradeSample`,
+  `sendTrainerGrade`, `isTrainerConnected`, telemetry/status callbacks) is
+  protocol-agnostic, so `movement.mjs`/`telemetry-ui.mjs`/`app.js` never learn
+  which is active. `sendTrainerGrade` dispatches to the FE-C Track Resistance
+  write when `trainer.protocol === "fec"`; FTMS-only commands
+  (`sendTrainerCommand` Start/Stop/Reset/Request-Control) are simply no-ops on
+  FE-C (its `controlPoint` is null and FE-C needs no control handshake). The
+  wire format is a hand-rolled ANT+ FE-C codec in the pure, tested `fec.mjs`
+  (ANT framing + XOR checksum; page 51 Track Resistance grade encode with its
+  −200% offset; page 16/25 speed/power/cadence decode); `trainer-fec.mjs` is
+  the BLE IO around it and adapts to whether a device wraps pages in ANT
+  framing or sends them bare (learned from the first parseable notification).
+  FE-C carries no calories field, so calories come from power for those
+  trainers. `TACX_FEC_DEFAULT_CRR` (the rolling-resistance coefficient sent
+  with each grade) lives in `tuning.yaml`.
 - **3D map geometry**: never render lines with `CLAMP_TO_GROUND` — draped
   strokes smear down steep slopes into wide blobs. The route line floats at
   `ROUTE_LINE_ALTITUDE_METERS` (2.5m) with its path densified (`densifyRoute`)
