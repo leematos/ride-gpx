@@ -61,6 +61,7 @@ export const RIDE_SAVE_THROTTLE_MS = req("movement", "ride_save_throttle_ms");
 export const DEFAULT_GRADE_INTERVAL_SECONDS = req("trainer", "grade_interval", "default_seconds");
 export const GRADE_INTERVAL_MIN_SECONDS = req("trainer", "grade_interval", "min_seconds");
 export const GRADE_INTERVAL_MAX_SECONDS = req("trainer", "grade_interval", "max_seconds");
+export const TACX_FEC_DEFAULT_CRR = req("trainer", "fec_default_crr");
 
 // Route math
 export const GRADE_LOOKAROUND_METERS = req("route_math", "grade_lookaround_meters");

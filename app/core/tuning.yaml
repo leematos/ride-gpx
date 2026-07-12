@@ -81,6 +81,12 @@ trainer:
     default_seconds: 2
     min_seconds: 1
     max_seconds: 5
+  # Rolling-resistance coefficient sent with every Track Resistance (grade)
+  # command to a Tacx FE-C trainer (the wheel-on Flow/Vortex/Bushido/Genius,
+  # which speak ANT+ FE-C over BLE instead of FTMS). 0.004 is a typical
+  # asphalt value; raise it for a heavier simulated surface. Ignored by FTMS
+  # trainers, whose Set Simulation Parameters carries its own rolling term.
+  fec_default_crr: 0.004
 
 # --- Route math (grade, ascent/descent) --------------------------------------
 route_math:

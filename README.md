@@ -25,7 +25,7 @@ It is built for people who want to:
 
 - ride their own routes indoors over real-world 3D scenery;
 - preview climbs before riding them outside;
-- control an FTMS-compatible smart trainer directly from the browser;
+- control an FTMS-compatible or Tacx FE-C smart trainer directly from the browser;
 - export virtual rides as FIT files for services such as Strava and Garmin Connect;
 - self-host, modify, or contribute without a backend or build system.
 
@@ -33,7 +33,7 @@ It is built for people who want to:
 
 - **Bring any GPX track** — open a local file or choose a ready-to-ride route from the built-in gallery.
 - **Photorealistic 3D terrain** — follow elevated, grade-colored route lines through Google Photorealistic 3D Maps with a real 3D rider marker, beacon, minimap, and terrain-aware camera lift.
-- **Bluetooth trainer control** — connect an FTMS-compatible smart trainer through Web Bluetooth. Trainer-reported speed advances the rider while route grade drives indoor-bike simulation resistance.
+- **Bluetooth trainer control** — connect an FTMS-compatible smart trainer, or a Tacx FE-C trainer (the wheel-on Flow/Vortex/Bushido/Genius, which predate FTMS), through Web Bluetooth. Trainer-reported speed advances the rider while route grade drives simulated resistance.
 - **Heart-rate support** — connect a standard Bluetooth heart-rate strap or use heart-rate data reported by the trainer.
 - **Route intelligence** — calculate distance, noise-filtered ascent and descent, grade, difficulty, terrain classification, sustained climbs, and smart ETA directly from the GPX data.
 - **Climb and segment focus** — inspect detected climbs or drag across the elevation profile to select any custom route segment.
@@ -51,7 +51,7 @@ It is built for people who want to:
 
 1. Open GPX Rider in Chrome or Edge.
 2. Choose **Open GPX file…** or select a route from **Browse gallery**. If there is no saved ride or route deep-link, the app automatically opens the first gallery route.
-3. Select **Connect** beside the smart trainer and choose an FTMS-compatible device.
+3. Select **Connect** beside the smart trainer and choose an FTMS-compatible or Tacx FE-C device.
 4. Optionally connect a Bluetooth heart-rate strap the same way.
 5. Start pedaling. Trainer speed moves the rider along the route, while the current GPX grade is sent back to the trainer.
 6. Use **Download .FIT** whenever you want to export the recorded ride.
@@ -177,6 +177,16 @@ Keeping the camera above the ground needs to know where the ground actually is �
 
 The pure tile math (Web Mercator coordinates, Terrarium decode) lives in [`app/map/terrain-tiles-math.mjs`](app/map/terrain-tiles-math.mjs) and is unit-tested; the fetch/decode/cache machinery is in [`app/map/terrain-tiles.mjs`](app/map/terrain-tiles.mjs). Every knob — the tile source, zoom, cache size, and attribution — is documented under `terrain_tiles` in [`app/core/tuning.yaml`](app/core/tuning.yaml).
 
+### Two trainer protocols behind one interface
+
+Most modern smart trainers speak the standard Fitness Machine Service (FTMS) over Bluetooth, but the wheel-on Tacx trainers (Flow, Vortex, Bushido, Genius) predate it and expose no FTMS service at all — they tunnel ANT+ FE-C over a vendor Bluetooth service instead. GPX Rider supports both from a single pairing flow:
+
+- **Protocol detection at connect time.** The pairing dialog advertises both services; once a device is chosen, the app inspects which control service it actually exposes and routes to the matching backend — FTMS for KICKR-class trainers, FE-C for Tacx. The rest of the app (movement, grade updates, telemetry, status) talks to one unchanged interface and never learns which protocol is underneath.
+- **A hand-rolled ANT+ FE-C codec.** Rather than pull in a dependency, the FE-C wire format is encoded and decoded by hand — the same approach the FIT exporter takes. It builds ANT serial frames (sync byte, length, XOR checksum), encodes the grade as a *Track Resistance* page (page 51, with its −200 %-offset fixed-point grade field), and decodes the trainer's *General FE Data* (speed) and *Specific Trainer Data* (power, cadence) telemetry pages.
+- **Framing that adapts to the device.** Some FE-C peripherals wrap their pages in ANT framing and some send them bare; the backend learns which from the first parseable notification and mirrors it — including the ANT channel — on every control write.
+
+The pure framing and page codec is isolated in [`app/trainer/fec.mjs`](app/trainer/fec.mjs) and covered by unit tests for checksums, frame round-tripping, grade encoding across the clamped range, and telemetry decoding. The Bluetooth backend that composes it lives in [`app/trainer/trainer-fec.mjs`](app/trainer/trainer-fec.mjs); protocol detection and routing stay in [`app/trainer/trainer.mjs`](app/trainer/trainer.mjs). The rolling-resistance coefficient sent with each grade command is tunable under `trainer` in [`app/core/tuning.yaml`](app/core/tuning.yaml).
+
 ### Architecture
 
 - **Zero build step, vanilla ES modules, no package dependencies.** The deployed `app/` directory is static HTML, CSS, JavaScript, and assets.
@@ -244,10 +254,10 @@ When **online terrain** is enabled (on by default), the app anonymously fetches 
 - The complete visual app and Simulation mode work without cycling hardware.
 - Trainer and heart-rate connections require a secure context and a browser with [Web Bluetooth support](https://developer.chrome.com/docs/capabilities/bluetooth). Chrome and Edge are the intended browsers.
 - Bluetooth device selection, permissions, and remembered-device access are controlled by the browser. If a saved device is unavailable, select **Connect** again.
-- FTMS-compatible trainers are the primary hardware target. Older firmware and proprietary control protocols may require trainer-specific work.
+- FTMS-compatible trainers are the primary hardware target; wheel-on Tacx trainers are supported through their ANT+ FE-C over Bluetooth protocol. Other proprietary control protocols may still require trainer-specific work.
 - Total ascent and descent are calculated from noise-filtered GPX elevation and may differ from another planner or head unit.
 - Smart ETA needs about a minute of real pedaling before it trusts the measured pace; until then it projects from current speed.
-- Calories are shown and exported only when the trainer reports FTMS Expended Energy.
+- Calories are derived from power, or taken from FTMS Expended Energy when an FTMS trainer reports it (FE-C trainers report no energy field, so calories come from power).
 - Heart rate comes from a paired strap or, as a fallback, the trainer's own heart-rate field.
 - Terrain avoidance uses the route's own elevation as a free offline floor and, when online terrain is enabled, augments it with free public Mapzen/AWS terrain tiles. With online terrain off (or before tiles load), it works best where the route itself follows the hillside.
 
@@ -255,8 +265,9 @@ When **online terrain** is enabled (on by default), the app anonymously fetches 
 
 The primary development and real-ride setup is:
 
-- **Wahoo KICKR v4** — smart trainer;
-- **Wahoo TICKR** — Bluetooth heart-rate monitor.
+- **Wahoo KICKR v4** — smart trainer (FTMS);
+- **Wahoo TICKR** — Bluetooth heart-rate monitor;
+- **Tacx Flow (smart)** — smart trainer (ANT+ FE-C); verified: pairing, grade/resistance control, and speed and power telemetry.
 
 Other FTMS-compatible trainers and standard Bluetooth heart-rate sensors are expected to work, but this is the reference hardware tested against the app.
 
