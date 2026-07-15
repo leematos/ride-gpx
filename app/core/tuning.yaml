@@ -813,6 +813,18 @@ training_zones:
   heart_rate_max_age_formula_base: 220
   profile_history_sample_limit: 1800
 
+  # Cadence meter (fullscreen left-side HUD): a fixed rpm scale with green in
+  # the target pedaling range and yellow/red bands outside it — unlike
+  # power/HR this isn't derived from a rider profile, so the bounds are plain
+  # constants rather than a formula.
+  cadence_meter_min_rpm: 40
+  cadence_meter_max_rpm: 140
+  cadence_zone_green_min_rpm: 90
+  cadence_zone_green_max_rpm: 110
+  cadence_zone_yellow_min_rpm: 75
+  cadence_zone_yellow_max_rpm: 125
+  cadence_zone_colors: { red: "#d9542f", yellow: "#e8b74e", green: "#57b877" }
+
   # Gross metabolic efficiency for converting measured cycling work into active
   # human calories. Power meters report mechanical work at the pedals; humans
   # spend more chemical energy than that to produce it. 0.24 means 24% of the
