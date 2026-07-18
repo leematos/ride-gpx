@@ -128,9 +128,3 @@ export function syncDemoModeUi() {
   els.connectHrBtn.disabled = state.demoModeActive;
   els.demoBanner.hidden = !(state.demoModeActive && state.pedaling);
 }
-
-// The demo chip stacks in the center column below the climb banner — the
-// screen manager handles the spacing that used to be measured by hand here.
-export function registerDemoBannerHud() {
-  registerHudComponent({ id: "demo-banner", region: "center", weight: 20, element: els.demoBanner });
-}
