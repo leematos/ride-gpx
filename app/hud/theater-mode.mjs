@@ -29,11 +29,6 @@ const EXIT_TITLE = `Exit the ${RECORDING_SIZE_LABEL} map view`;
 export function initTheaterModeUi() {
   els.mapViewport.style.setProperty("--recording-viewport-w", `${RECORDING_MAP_VIEWPORT_WIDTH_PIXELS}px`);
   els.mapViewport.style.setProperty("--recording-viewport-h", `${RECORDING_MAP_VIEWPORT_HEIGHT_PIXELS}px`);
-  els.resizeRecordingWindowBtn.textContent = `${RECORDING_SIZE_LABEL} map`;
-  els.resizeRecordingWindowBtn.title = ENTER_TITLE;
-  if (els.theaterHudTogglesLabel) {
-    els.theaterHudTogglesLabel.textContent = `Hide in ${RECORDING_SIZE_LABEL} view`;
-  }
 }
 
 export function toggleTheaterMode(event) {
