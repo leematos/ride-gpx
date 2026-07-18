@@ -160,12 +160,12 @@ function bindEvents() {
   els.maxHeartRateInput.addEventListener("change", updateRiderProfileFromControls);
   els.ftpInput.addEventListener("change", updateRiderProfileFromControls);
   els.zoneHelpButtons.forEach((button) => button.addEventListener("click", toggleZoneHelp));
-  els.theaterHideClockInput.addEventListener("change", updateDisplaySettingsFromControls);
-  els.theaterHideMetersInput.addEventListener("change", updateDisplaySettingsFromControls);
-  els.theaterHideDockInput.addEventListener("change", updateDisplaySettingsFromControls);
-  els.theaterHideClimbBannerInput.addEventListener("change", updateDisplaySettingsFromControls);
-  els.theaterHideDemoChipInput.addEventListener("change", updateDisplaySettingsFromControls);
-  els.theaterHideControlsInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideClockInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideMetersInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideDockInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideClimbBannerInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideDemoChipInput.addEventListener("change", updateDisplaySettingsFromControls);
+  //els.theaterHideControlsInput.addEventListener("change", updateDisplaySettingsFromControls);
   els.hudLessBtn.addEventListener("click", () => adjustHudVisibleCount(-1));
   els.hudMoreBtn.addEventListener("click", () => adjustHudVisibleCount(1));
   els.hudSettingsBtn.addEventListener("click", () => openSettings("hud"));
