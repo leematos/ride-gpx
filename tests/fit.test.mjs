@@ -13,9 +13,9 @@ function sampleRide() {
   const startSeconds = START_MS / 1000;
   return {
     samples: [
-      { t: startSeconds, lat: 50.087, lng: 14.421, ele: 200, distance: 0, speedKph: 0, powerWatts: 0, heartRateBpm: 90 },
-      { t: startSeconds + 1, lat: 50.0871, lng: 14.4211, ele: 200.4, distance: 12, speedKph: 25.4, powerWatts: 180, heartRateBpm: 120 },
-      { t: startSeconds + 2, lat: 50.0872, lng: 14.4212, ele: 200.9, distance: 25, speedKph: null, powerWatts: null, heartRateBpm: null },
+      { t: startSeconds, lat: 50.087, lng: 14.421, ele: 200, distance: 0, speedKph: 0, powerWatts: 0, heartRateBpm: 90, cadenceRpm: 62 },
+      { t: startSeconds + 1, lat: 50.0871, lng: 14.4211, ele: 200.4, distance: 12, speedKph: 25.4, powerWatts: 180, heartRateBpm: 120, cadenceRpm: 90 },
+      { t: startSeconds + 2, lat: 50.0872, lng: 14.4212, ele: 200.9, distance: 25, speedKph: null, powerWatts: null, heartRateBpm: null, cadenceRpm: null },
     ],
     summary: {
       startTimeMs: START_MS,
@@ -80,6 +80,37 @@ test("encoded activity carries the app product name", () => {
 
 test("encoding refuses an empty ride", () => {
   assert.throws(() => encodeFitActivity({ samples: [], summary: {} }));
+});
+
+test("record message carries cadence alongside heart rate", () => {
+  const ride = sampleRide();
+  const bytes = encodeFitActivity(ride);
+
+  // Locate the record definition message (global msg 20) to find where its
+  // field definitions end and the data records begin, without hardcoding
+  // offsets that depend on the messages written before it.
+  const defHeader = [0x00, 0x00, 20, 0]; // reserved, little-endian arch, global msg 20 (LE)
+  let defIndex = -1;
+  for (let i = 1; i < bytes.length - defHeader.length; i += 1) {
+    if ((bytes[i - 1] & 0xf0) === 0x40 && defHeader.every((b, j) => bytes[i + j] === b)) {
+      defIndex = i - 1;
+      break;
+    }
+  }
+  assert.ok(defIndex >= 0, "record definition message found");
+
+  const fieldCount = bytes[defIndex + 5];
+  let recordSize = 1; // local type byte
+  for (let f = 0; f < fieldCount; f += 1) {
+    recordSize += bytes[defIndex + 6 + f * 3 + 1]; // size byte of each field definition
+  }
+  const recordDataStart = defIndex + 6 + fieldCount * 3;
+
+  ride.samples.forEach((sample, i) => {
+    const cadenceByte = bytes[recordDataStart + i * recordSize + recordSize - 1];
+    const expected = Number.isFinite(sample.cadenceRpm) ? sample.cadenceRpm : 0xff;
+    assert.equal(cadenceByte, expected, `sample ${i} cadence byte`);
+  });
 });
 
 test("activity local_timestamp is shifted by the local UTC offset", () => {
