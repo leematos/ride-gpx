@@ -160,12 +160,6 @@ function bindEvents() {
   els.maxHeartRateInput.addEventListener("change", updateRiderProfileFromControls);
   els.ftpInput.addEventListener("change", updateRiderProfileFromControls);
   els.zoneHelpButtons.forEach((button) => button.addEventListener("click", toggleZoneHelp));
-  //els.theaterHideClockInput.addEventListener("change", updateDisplaySettingsFromControls);
-  //els.theaterHideMetersInput.addEventListener("change", updateDisplaySettingsFromControls);
-  //els.theaterHideDockInput.addEventListener("change", updateDisplaySettingsFromControls);
-  //els.theaterHideClimbBannerInput.addEventListener("change", updateDisplaySettingsFromControls);
-  //els.theaterHideDemoChipInput.addEventListener("change", updateDisplaySettingsFromControls);
-  //els.theaterHideControlsInput.addEventListener("change", updateDisplaySettingsFromControls);
   els.hudLessBtn.addEventListener("click", () => adjustHudVisibleCount(-1));
   els.hudMoreBtn.addEventListener("click", () => adjustHudVisibleCount(1));
   els.hudSettingsBtn.addEventListener("click", () => openSettings("hud"));
@@ -181,8 +175,6 @@ function bindEvents() {
   els.resetRenderingBtn.addEventListener("click", resetRenderingToDefaults);
   els.connectBtn.addEventListener("click", connectTrainer);
   els.connectHrBtn.addEventListener("click", connectHeartRate);
-  //els.demoModeBtn.addEventListener("click", toggleDemoMode);
-  //els.resizeRecordingWindowBtn.addEventListener("click", toggleTheaterMode);
   els.startBtn.addEventListener("click", toggleSimulation);
   els.resetBtn.addEventListener("click", resetRide);
   els.downloadFitBtn.addEventListener("click", downloadFitFile);
@@ -202,9 +194,6 @@ function bindEvents() {
   els.screenshotButtonInput.addEventListener("change", updateScreenshotSettingsFromControls);
   els.screenshotAspectSelect.addEventListener("change", updateScreenshotSettingsFromControls);
   els.screenshotWidthSelect.addEventListener("change", updateScreenshotSettingsFromControls);
-  els.galleryTitleInput.addEventListener("input", updateGalleryMetadataExport);
-  els.galleryDescriptionInput.addEventListener("input", updateGalleryMetadataExport);
-  els.copyGalleryMetadataBtn.addEventListener("click", copyGalleryMetadata);
   document.addEventListener("fullscreenchange", handleFullscreenChange);
   document.addEventListener("visibilitychange", handleVisibilityChange);
   document.addEventListener("keydown", (event) => {
