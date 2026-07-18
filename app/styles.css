@@ -359,6 +359,7 @@ body {
 #map {
   position: absolute;
   inset: 0;
+  z-index: 5;
 }
 
 #map .leaflet-container {
