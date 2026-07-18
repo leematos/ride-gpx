@@ -108,7 +108,6 @@ async function startApp() {
   initScreenManager(els.mapViewport);
   initTheaterModeUi();
   registerClimbBannerHud();
-  registerDemoBannerHud();
   registerTrainingMetersHud();
 
   restoreSettings();
