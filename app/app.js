@@ -182,7 +182,7 @@ function bindEvents() {
   els.connectBtn.addEventListener("click", connectTrainer);
   els.connectHrBtn.addEventListener("click", connectHeartRate);
   //els.demoModeBtn.addEventListener("click", toggleDemoMode);
-  els.resizeRecordingWindowBtn.addEventListener("click", toggleTheaterMode);
+  //els.resizeRecordingWindowBtn.addEventListener("click", toggleTheaterMode);
   els.startBtn.addEventListener("click", toggleSimulation);
   els.resetBtn.addEventListener("click", resetRide);
   els.downloadFitBtn.addEventListener("click", downloadFitFile);
