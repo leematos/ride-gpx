@@ -146,12 +146,12 @@ export function updateDisplaySettingsFromControls() {
 }
 
 export function syncDisplayControls() {
-  els.theaterHideClockInput.checked = state.theaterHideClock;
-  els.theaterHideMetersInput.checked = state.theaterHideMeters;
-  els.theaterHideDockInput.checked = state.theaterHideDock;
-  els.theaterHideClimbBannerInput.checked = state.theaterHideClimbBanner;
-  els.theaterHideDemoChipInput.checked = state.theaterHideDemoChip;
-  els.theaterHideControlsInput.checked = state.theaterHideControls;
+  //els.theaterHideClockInput.checked = state.theaterHideClock;
+  //els.theaterHideMetersInput.checked = state.theaterHideMeters;
+  //els.theaterHideDockInput.checked = state.theaterHideDock;
+  //els.theaterHideClimbBannerInput.checked = state.theaterHideClimbBanner;
+  //els.theaterHideDemoChipInput.checked = state.theaterHideDemoChip;
+  //els.theaterHideControlsInput.checked = state.theaterHideControls;
   renderHudOrderControls();
 }
 
