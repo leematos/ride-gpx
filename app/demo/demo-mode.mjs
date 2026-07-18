@@ -121,10 +121,10 @@ export function advanceDemoTelemetry(elapsedSeconds, grade, metersAdvanced, { re
 export function syncDemoModeUi() {
   const hasRoute = state.route.length > 1;
   const blockedByRealDevice = !state.demoModeActive && (isTrainerConnected() || isHeartRateConnected());
-  els.demoModeBtn.disabled = !hasRoute || blockedByRealDevice;
-  els.demoModeBtn.setAttribute("aria-pressed", String(state.demoModeActive));
-  els.demoModeBtn.textContent = state.demoModeActive ? "Stop demo" : "Demo mode";
-  els.connectBtn.disabled = state.demoModeActive;
-  els.connectHrBtn.disabled = state.demoModeActive;
-  els.demoBanner.hidden = !(state.demoModeActive && state.pedaling);
+  //els.demoModeBtn.disabled = !hasRoute || blockedByRealDevice;
+ // els.demoModeBtn.setAttribute("aria-pressed", String(state.demoModeActive));
+  //els.demoModeBtn.textContent = state.demoModeActive ? "Stop demo" : "Demo mode";
+  //els.connectBtn.disabled = state.demoModeActive;
+  //els.connectHrBtn.disabled = state.demoModeActive;
+  //els.demoBanner.hidden = !(state.demoModeActive && state.pedaling);
 }
