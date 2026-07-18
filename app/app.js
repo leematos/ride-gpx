@@ -138,7 +138,6 @@ async function startApp() {
 }
 
 function bindEvents() {
-  els.settingsBtn.addEventListener("click", () => openSettings());
   els.mapSettingsShortcutBtn?.addEventListener("click", () => openSettings());
   els.settingsCloseBtn.addEventListener("click", () => els.settingsDialog.close());
   els.settingsDoneBtn.addEventListener("click", () => els.settingsDialog.close());
