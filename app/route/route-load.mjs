@@ -50,8 +50,6 @@ export function applyGpxText(text, { overrideName = null, fallbackName = null, g
     return;
   }
 
-  stopDemoMode({ silent: true });
-  clearDemoHistory();
   state.route = enrichRoute(route);
   state.routeName = overrideName || gpxName || fallbackName;
   state.galleryMetadata = galleryMetadata && typeof galleryMetadata === "object"
