@@ -35,7 +35,7 @@
 
 app:
   # The product name shown in the UI and written into exported files.
-  name: "GPX Rider"
+  name: "Ride GPX"
 
 # --- Movement & pedaling -----------------------------------------------------
 movement:
