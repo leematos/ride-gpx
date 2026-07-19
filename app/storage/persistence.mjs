@@ -245,7 +245,6 @@ export function restoreSavedRide() {
   updateRideUi({ force: true });
   els.startBtn.disabled = false;
   els.resetBtn.disabled = false;
-  syncDemoModeUi();
 }
 
 export function saveRideThrottled() {
