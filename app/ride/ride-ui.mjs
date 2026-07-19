@@ -80,7 +80,6 @@ export function updateRideUi(options = {}) {
   updateClimbStatus(point);
   renderProfile(progress);
   updateMapFollow(point);
-  updateGalleryMetadataExport();
 
   els.hudGradeStat.textContent = `${grade.toFixed(1)}%`;
   els.hudRiddenStat.textContent = riddenText;
