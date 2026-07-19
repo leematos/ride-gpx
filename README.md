@@ -1,21 +1,10 @@
-# GPX Rider
+# Ride GPX
 
 **A free, open-source virtual cycling trainer that runs in your browser.** Load any GPX route, ride it on a live top-down map, and let the real road gradient control your Bluetooth smart trainer.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](LICENSE)
 
-**[Launch GPX Rider →](https://gpx-rider.github.io/app.html)**  
-[About GPX Rider](https://gpx-rider.github.io/)
-
 **Zero friction:** The live app requires **zero accounts, zero installations, and zero API keys** — the map is OpenStreetMap, which is free and needs no key for anyone, hosted or self-hosted. Open it and ride.
-
-The landing page uses the Ještěd climb as an animated top-down backdrop and gives a quick overview of GPX Rider's features and riding workflow.
-
-## Screenshots
-
-![Ride HUD](screenshots/ride.jpg)
-![Setup screen](screenshots/setup.jpg)
-![Route gallery](screenshots/gallery.jpg)
 
 ## Why GPX Rider?
 
