@@ -124,12 +124,6 @@ async function startApp() {
   // ahead of any saved ride or the first-open auto-load (handled in
   // gallery.mjs).
   const requestedRouteId = new URLSearchParams(location.search).get("route");
-  void initGallery(loadGpxFromUrl, {
-    shouldAutoLoadFirst: () => state.route.length < 2 && Boolean(state.map),
-    getRequestedRouteId: () => requestedRouteId,
-    getCurrentRouteName: () => state.routeName,
-    getDistanceUnits: () => state.distanceUnits,
-  });
 }
 
 function bindEvents() {
