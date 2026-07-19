@@ -4,10 +4,8 @@
 
 import { detectClimbs } from "./climbs.mjs";
 import { focusClimb, syncFocusedClimbList } from "./climbs-ui.mjs";
-import { clearDemoHistory, stopDemoMode, syncDemoModeUi } from "../demo/demo-mode.mjs";
 import { classifyRoute } from "./difficulty.mjs";
 import { createRideEstimator } from "../ride/eta.mjs";
-import { resetGalleryMetadataExportForRoute } from "../gallery-ui/gallery-export.mjs";
 import { updateStartButton } from "../ride/movement.mjs";
 import { enterOverviewMode } from "../map/map-view.mjs";
 import { saveRide } from "../storage/persistence.mjs";
