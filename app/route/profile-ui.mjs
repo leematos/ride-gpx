@@ -18,6 +18,17 @@ import {
   PROFILE_SEGMENT_SELECTION_DRAG_PIXELS,
 } from "../core/tuning.mjs";
 
+// The canvas's backing buffer is only reallocated to match its CSS box when
+// it draws (see profile.mjs#configureCanvas). Its box size tracks flex
+// layout (.fs-road-plot, .control-pane), which changes on window resize
+// without the canvas itself firing any event, so without this the stale
+// buffer stretches to fill the new box (including its label text) until the
+// next unrelated re-render. ResizeObserver is the one signal that fires
+// exactly when that box size changes.
+export function bindProfileResize() {
+  new ResizeObserver(() => renderProfile()).observe(els.profile);
+}
+
 export function renderProfile(progress = currentRideProgress()) {
   if (!state.route.length) {
     drawEmptyProfile(els.profile, { dark: true });
