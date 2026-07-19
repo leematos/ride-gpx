@@ -7,7 +7,6 @@
 
 import { syncCenterRiderButton, enterOverviewMode } from "../map/map-view.mjs";
 import { syncDemoModeUi } from "../demo/demo-mode.mjs";
-import { resetGalleryMetadataExportForRoute } from "../gallery-ui/gallery-export.mjs";
 import { clamp, roundCoordinate } from "../core/geo.mjs";
 import { normalizeHudOrder } from "../hud/map-hud.mjs";
 import { updateStartButton } from "../ride/movement.mjs";
