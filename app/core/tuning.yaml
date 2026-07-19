@@ -175,7 +175,7 @@ eta:
 map:
   # Standard OpenStreetMap tile server. "{s}" is a load-balanced subdomain,
   # "{z}/{x}/{y}" the standard slippy-map tile coordinate.
-  tile_url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+  tile_url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png"
   tile_subdomains: ["a", "b", "c"]
   # Required by the OpenStreetMap tile usage policy — never remove or hide it.
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
