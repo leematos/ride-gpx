@@ -65,7 +65,6 @@ export function applyGpxText(text, { overrideName = null, fallbackName = null, g
   // A new route is a new ride: the ETA pace history starts over.
   state.rideEstimator = createRideEstimator();
   state.overviewActive = true;
-  resetGalleryMetadataExportForRoute();
   enterOverviewMode({ instant: true });
   updateStartButton();
   renderRoute();
