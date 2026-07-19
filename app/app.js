@@ -24,6 +24,7 @@ import {
 import { handleVisibilityChange, resetRide, toggleSimulation } from "./ride/movement.mjs";
 import { restoreSavedRide, restoreSettings, saveRide } from "./storage/persistence.mjs";
 import {
+  bindProfileResize,
   cancelProfileSelection,
   handleProfileClick,
   handleProfileHover,
@@ -177,6 +178,7 @@ function bindEvents() {
   els.profile.addEventListener("pointerup", handleProfilePointerUp);
   els.profile.addEventListener("pointercancel", cancelProfileSelection);
   els.profile.addEventListener("click", handleProfileClick);
+  bindProfileResize();
   els.fullscreenBtn.addEventListener("click", toggleMapFullscreen);
   els.dockToggleBtn.addEventListener("click", toggleHudDock);
   els.overviewToggleBtn.addEventListener("click", toggleRouteOverview);
