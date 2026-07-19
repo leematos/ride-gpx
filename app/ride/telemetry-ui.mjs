@@ -168,5 +168,4 @@ export function updateTelemetryUi() {
   els.hudSpeedStat.textContent = speedText;
   els.hudHeartRateStat.textContent = heartRateText;
   els.hudCaloriesStat.textContent = caloriesText;
-  syncDemoModeUi();
 }
