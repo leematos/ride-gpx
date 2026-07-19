@@ -165,7 +165,7 @@ Or run the default project check:
 make
 ```
 
-The default target regenerates derived gallery data and runs the tests. The GitHub Pages deployment performs the same generation before publishing.
+The default target runs the tests.
 
 ## Hosting your own copy
 
