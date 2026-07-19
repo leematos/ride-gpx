@@ -75,7 +75,6 @@ export function applyGpxText(text, { overrideName = null, fallbackName = null, g
 
   els.startBtn.disabled = false;
   els.resetBtn.disabled = false;
-  syncDemoModeUi();
 }
 
 // Route name (top-bar GPX chip), classification (difficulty stat tile) and
