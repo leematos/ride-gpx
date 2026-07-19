@@ -237,7 +237,6 @@ export function restoreSavedRide() {
   state.simulating = false;
   state.lastTick = 0;
 
-  resetGalleryMetadataExportForRoute();
   enterOverviewMode({ instant: true });
   updateStartButton();
   renderRoute();
