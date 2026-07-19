@@ -9,7 +9,6 @@
 
 import { enterOverviewMode, returnToFollow, syncOverviewControls } from "../map/map-view.mjs";
 import { syncFocusedClimbList } from "../route/climbs-ui.mjs";
-import { advanceDemoTelemetry, stopDemoMode, syncDemoModeUi } from "../demo/demo-mode.mjs";
 import { recordEstimatorTick } from "./eta.mjs";
 import { clamp } from "../core/geo.mjs";
 import { saveRide, saveRideThrottled } from "../storage/persistence.mjs";
