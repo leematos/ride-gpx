@@ -6,7 +6,6 @@
 import { updateClimbStatus, updateFullscreenClimbBanner } from "../route/climbs-ui.mjs";
 import { estimateRemainingSeconds } from "./eta.mjs";
 import { updateMapFollow } from "../map/map-view.mjs";
-import { updateGalleryMetadataExport } from "../gallery-ui/gallery-export.mjs";
 import { clamp } from "../core/geo.mjs";
 import { updateFullscreenClock } from "../hud/map-hud.mjs";
 import { isMoving } from "./movement.mjs";
