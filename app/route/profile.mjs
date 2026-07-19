@@ -298,8 +298,13 @@ function drawGradeBars(ctx, { route, totalDistance, chartLeft, chartRight, chart
     const from = samples[i];
     const to = samples[i + 1];
     const midDistance = (from.distance + to.distance) / 2;
-    const grade = gradeAt(route, midDistance);
-
+    // Match gradeAt's sampling window to this bar's own span instead of the
+    // fixed default (tuned for the single-point HUD/hover grade readout) —
+    // otherwise each bar's color reflects a tiny fixed-size slice unrelated
+    // to the (width-dependent) span it's actually drawn over, so the same
+    // stretch of route paints a different color depending on canvas width.
+    const grade = gradeAt(route, midDistance, { lookaroundMeters: (to.distance - from.distance) / 2 });
+    
     const x0 = xFor(from.distance);
     const x1 = xFor(to.distance);
     const y0 = yFor(from.ele);
