@@ -3,7 +3,6 @@
 // app does with the numbers), the HR source-of-truth resolution, calories and
 // ride-timer accessors, and the telemetry readouts in the panel + HUD.
 
-import { stopDemoMode, syncDemoModeUi } from "../demo/demo-mode.mjs";
 import { isHeartRateConnected } from "../trainer/heartrate.mjs";
 import { setPedaling, updatePedalingFromSpeed } from "./movement.mjs";
 import { rideLogSummary } from "./recorder.mjs";
