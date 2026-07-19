@@ -569,7 +569,7 @@ climb_detection:
     - max_length_meters: 350
       min_average_grade_percent: 4.0
     - max_length_meters: 700
-      min_average_grade_percent: 3.0
+      min_average_grade_percent: 2.9
     - max_length_meters: 1500
       min_average_grade_percent: 2.0
     - max_length_meters: .inf
