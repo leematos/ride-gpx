@@ -91,7 +91,6 @@ body {
   justify-content: space-between;
   gap: 12px;
   height: 62px;
-  padding: 0 22px;
   background: var(--bar);
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
