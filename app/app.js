@@ -10,8 +10,6 @@ import {
   toggleRouteOverview,
   updateCenterRiderFromControl,
 } from "./map/map-view.mjs";
-import { copyGalleryMetadata, syncGalleryMetadataExportAvailability, updateGalleryMetadataExport } from "./gallery-ui/gallery-export.mjs";
-import { initGallery } from "./gallery-ui/gallery.mjs";
 import { connectHeartRate, initHeartRate, reconnectSavedHeartRate } from "./trainer/heartrate.mjs";
 import { initMap } from "./map/map-init.mjs";
 import {
