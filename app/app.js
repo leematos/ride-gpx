@@ -116,7 +116,6 @@ async function startApp() {
   bindEvents();
   initializeMapHud();
   restoreSavedRide();
-  syncGalleryMetadataExportAvailability();
   void reconnectSavedTrainer();
   void reconnectSavedHeartRate();
   // First open with no saved ride: start on the first gallery route instead
