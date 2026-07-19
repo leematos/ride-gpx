@@ -6,7 +6,6 @@
 // to restoreSettings AND saveSettings here, plus the feature's own sync/apply.
 
 import { syncCenterRiderButton, enterOverviewMode } from "../map/map-view.mjs";
-import { syncDemoModeUi } from "../demo/demo-mode.mjs";
 import { clamp, roundCoordinate } from "../core/geo.mjs";
 import { normalizeHudOrder } from "../hud/map-hud.mjs";
 import { updateStartButton } from "../ride/movement.mjs";
