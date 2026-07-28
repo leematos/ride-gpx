@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-connect-gatt"
+description = "Enables the connect_gatt command."
+commands.allow = ["connect_gatt"]
+
+[[permission]]
+identifier = "deny-connect-gatt"
+description = "Denies the connect_gatt command."
+commands.deny = ["connect_gatt"]

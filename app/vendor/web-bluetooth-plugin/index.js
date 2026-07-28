@@ -25,6 +25,14 @@ export function getAvailability() {
   return call("get_availability");
 }
 
+// Not part of the upstream plugin — added in our vendored/patched Rust copy
+// (macos-app/src-tauri/vendor/tauri-plugin-web-bluetooth/) because
+// getAvailability() only reports whether adapter hardware exists, not
+// whether its radio is powered on. Returns "PoweredOn" | "PoweredOff" | "Unknown".
+export function getAdapterState() {
+  return call("get_adapter_state");
+}
+
 export function getDevices() {
   return call("get_devices");
 }

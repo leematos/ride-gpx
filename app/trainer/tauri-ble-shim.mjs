@@ -24,6 +24,7 @@
 import {
   connectGATT,
   disconnectGATT,
+  getAdapterState,
   getAvailability,
   getDevices as pluginGetDevices,
   getPrimaryServices,
@@ -160,12 +161,28 @@ function getPrimaryService(device, serviceUuid) {
   };
 }
 
-async function connectFakeDevice(device) {
-  await ensureGlobalListeners();
+// getAvailability() only reports whether adapter *hardware* exists, not
+// whether its radio is switched on — a Mac with Bluetooth toggled off still
+// "has" an adapter, so requestDevice()/connect would otherwise scan for the
+// full timeout and fail with an unhelpful "no devices found" instead of the
+// real, immediately-known reason. getAdapterState() is a GPX Rider addition
+// to the vendored plugin (see its NOTICE.md) exposing btleplug's actual
+// CentralState.
+async function ensureBluetoothReady() {
   const adapterAvailable = await getAvailability().catch(() => false);
   if (!adapterAvailable) {
-    throw new Error("Turn on Bluetooth to connect.");
+    throw new Error("No Bluetooth adapter found on this Mac.");
   }
+  const adapterState = await getAdapterState().catch(() => "Unknown");
+  if (adapterState !== "PoweredOn") {
+    console.warn(`[tauri-ble] adapter not powered on (state: ${adapterState})`);
+    throw new Error("Bluetooth is turned off. Turn it on in Control Center or System Settings, then try again.");
+  }
+}
+
+async function connectFakeDevice(device) {
+  await ensureGlobalListeners();
+  await ensureBluetoothReady();
 
   console.debug(`[tauri-ble] connecting GATT: ${device.name || device.id}`);
   const info = await connectGATT(device.id);
@@ -193,10 +210,7 @@ function toPluginFilters(filters) {
 }
 
 async function requestDevice(options = {}) {
-  const adapterAvailable = await getAvailability().catch(() => false);
-  if (!adapterAvailable) {
-    throw new Error("Turn on Bluetooth to pair a device.");
-  }
+  await ensureBluetoothReady();
 
   console.debug("[tauri-ble] requesting device", options.filters);
   const picked = await pluginRequestDevice({

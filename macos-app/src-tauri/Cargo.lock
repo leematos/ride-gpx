@@ -3515,7 +3515,6 @@ dependencies = [
 [[package]]
 name = "tauri-plugin-web-bluetooth"
 version = "0.1.0"
-source = "git+https://github.com/ParticleG/tauri-plugin-web-bluetooth-api?rev=742b6b6210ee1e979f3fc133e7bbdf9a626da31f#742b6b6210ee1e979f3fc133e7bbdf9a626da31f"
 dependencies = [
  "base64 0.22.1",
  "btleplug",
