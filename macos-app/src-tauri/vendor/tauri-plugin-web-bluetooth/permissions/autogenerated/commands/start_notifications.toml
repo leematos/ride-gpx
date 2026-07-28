@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-start-notifications"
+description = "Enables the start_notifications command."
+commands.allow = ["start_notifications"]
+
+[[permission]]
+identifier = "deny-start-notifications"
+description = "Denies the start_notifications command."
+commands.deny = ["start_notifications"]

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-stop-notifications"
+description = "Enables the stop_notifications command."
+commands.allow = ["stop_notifications"]
+
+[[permission]]
+identifier = "deny-stop-notifications"
+description = "Denies the stop_notifications command."
+commands.deny = ["stop_notifications"]

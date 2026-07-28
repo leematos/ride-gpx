@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-read-characteristic-value"
+description = "Enables the read_characteristic_value command."
+commands.allow = ["read_characteristic_value"]
+
+[[permission]]
+identifier = "deny-read-characteristic-value"
+description = "Denies the read_characteristic_value command."
+commands.deny = ["read_characteristic_value"]

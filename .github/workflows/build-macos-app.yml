@@ -1,0 +1,57 @@
+name: Build macOS app
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "macos-app/**"
+      - ".github/workflows/build-macos-app.yml"
+  pull_request:
+    paths:
+      - "app/**"
+      - "macos-app/**"
+      - ".github/workflows/build-macos-app.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject the Tauri Bluetooth bridge into app.html
+        run: python3 scripts/inject_macos_bluetooth_bridge.py
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: macos-app/src-tauri
+
+      - name: Cache Tauri CLI
+        id: cache-tauri-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri
+          key: tauri-cli-${{ runner.os }}-v2
+
+      - name: Install Tauri CLI
+        if: steps.cache-tauri-cli.outputs.cache-hit != 'true'
+        run: cargo install tauri-cli --version "^2.0.0" --locked
+
+      - name: Build macOS app
+        working-directory: macos-app
+        run: cargo tauri build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpx-rider-macos-${{ github.sha }}
+          path: |
+            macos-app/src-tauri/target/release/bundle/macos/*.app
+            macos-app/src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error

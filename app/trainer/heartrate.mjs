@@ -37,13 +37,15 @@ export async function connectHeartRate() {
 
   try {
     callbacks.onStatus("Pairing");
+    console.debug("[heartrate] requesting device (service 0x180D)");
     const device = await navigator.bluetooth.requestDevice({
       filters: [{ services: [HEART_RATE_SERVICE] }],
     });
+    console.debug(`[heartrate] device selected: ${device.name || device.id}`);
 
     await connectHeartRateDevice(device);
   } catch (error) {
-    console.error(error);
+    console.error("[heartrate] connect failed", error);
     callbacks.onStatus("Failed");
     callbacks.onMessage(connectionErrorMessage(error, "heart rate sensor"));
   }
@@ -56,12 +58,16 @@ export async function reconnectSavedHeartRate() {
   try {
     const devices = await navigator.bluetooth.getDevices();
     const device = devices.find((candidate) => candidate.id === saved.id || candidate.name === saved.name);
-    if (!device) return;
+    if (!device) {
+      console.debug(`[heartrate] saved device "${saved.name}" not among known devices; skipping reconnect`);
+      return;
+    }
 
+    console.debug(`[heartrate] reconnecting to saved device: ${device.name || device.id}`);
     callbacks.onStatus("Reconnecting");
     await connectHeartRateDevice(device);
   } catch (error) {
-    console.warn("Could not reconnect saved heart rate sensor.", error);
+    console.warn("[heartrate] could not reconnect saved heart rate sensor", error);
     callbacks.onStatus(saved.name || "Saved");
   }
 }
@@ -70,16 +76,20 @@ async function connectHeartRateDevice(device) {
   strap.device = null;
   strap.measurement = null;
   device.addEventListener("gattserverdisconnected", () => {
+    console.debug(`[heartrate] disconnected: ${device.name || device.id}`);
     strap.device = null;
     strap.measurement = null;
     callbacks.onHeartRate(null);
     callbacks.onStatus("Disconnected");
   });
 
+  console.debug(`[heartrate] connecting GATT: ${device.name || device.id}`);
   const service = await getPrimaryServiceWithRetry(device, HEART_RATE_SERVICE, "heart rate sensor");
+  console.debug(`[heartrate] Heart Rate service found; discovering Heart Rate Measurement characteristic`);
   strap.measurement = await service.getCharacteristic(HEART_RATE_MEASUREMENT);
   strap.measurement.addEventListener("characteristicvaluechanged", handleHeartRateMeasurement);
   await strap.measurement.startNotifications();
+  console.debug(`[heartrate] notifications started: ${device.name || device.id}`);
 
   strap.device = device;
   writeJson(HEART_RATE_STORAGE_KEY, {

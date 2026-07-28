@@ -118,6 +118,19 @@ Most modern smart trainers speak the standard Fitness Machine Service (FTMS) ove
 
 The pure framing and page codec is isolated in [`app/trainer/fec.mjs`](app/trainer/fec.mjs) and covered by unit tests for checksums, frame round-tripping, grade encoding across the clamped range, and telemetry decoding. The Bluetooth backend that composes it lives in [`app/trainer/trainer-fec.mjs`](app/trainer/trainer-fec.mjs); protocol detection and routing stay in [`app/trainer/trainer.mjs`](app/trainer/trainer.mjs). The rolling-resistance coefficient sent with each grade command is tunable under `trainer` in [`app/core/tuning.yaml`](app/core/tuning.yaml).
 
+### A native Bluetooth bridge for the macOS app
+
+`app/trainer/trainer.mjs` and `app/trainer/heartrate.mjs` are written
+directly against the standard Web Bluetooth API. The [macOS desktop
+app](macos-app/) wraps the same `app/` in a [Tauri](https://tauri.app/)
+webview, which has no Web Bluetooth implementation of its own, so it needed
+a bridge rather than a rewrite:
+
+- **A polyfill, not a fork.** [`app/trainer/tauri-ble-shim.mjs`](app/trainer/tauri-ble-shim.mjs) reimplements the exact slice of `navigator.bluetooth` those two modules use — `requestDevice()`/`getDevices()`, `device.gatt`, `service.getCharacteristic()`, notifications, `writeValue()` — backed by [tauri-plugin-web-bluetooth-api](https://github.com/ParticleG/tauri-plugin-web-bluetooth-api) (a [btleplug](https://github.com/deviceplug/btleplug)-based native BLE client that itself mirrors the Web Bluetooth API). `trainer.mjs`/`heartrate.mjs` needed zero changes, and neither did `app.html`'s committed source: the `<script type="module">` tag that loads the shim is injected by [`build-macos-app.yml`](.github/workflows/build-macos-app.yml) via `scripts/inject_macos_bluetooth_bridge.py` right before bundling, so the browser/GitHub Pages build never even references the shim, rather than relying on it to detect Tauri and no-op.
+- **A native device picker, not a hand-rolled one.** Rather than the shim scanning and rendering its own in-page chooser, device selection happens on the Rust side: `lib.rs` configures the plugin's `NativeDialogSelectionHandler`, which pops a small native window styled after Chromium's device chooser. `requestDevice()` in the shim is a thin pass-through to that command.
+- **Multiple simultaneous connections, matching the browser build.** The plugin keeps one GATT connection per device (keyed by device id) rather than a single global connection for the whole app, so the desktop build can hold a trainer *and* a heart-rate strap connected at once, same as the browser build.
+- **Vendored where possible, hand-ported where necessary.** The `core`/`event` modules of `@tauri-apps/api` are published pre-built ES modules, so they're vendored under `app/vendor/` exactly like Leaflet. The Bluetooth plugin itself isn't published to crates.io or npm as of this writing — `Cargo.toml` pins it via `git` + a commit `rev`, and its thin JS bindings are hand-ported (not vendored verbatim) into `app/vendor/web-bluetooth-plugin/`, documented there for re-syncing when the pin is bumped.
+
 ### Why a top-down map, and why vendored Leaflet
 
 GPX Rider used to render routes on Google's Photorealistic 3D Maps with a full follow-camera/cinematic-overview system (chase physics, terrain-avoidance lift, orbit/fly-by/fly-over flight patterns, physically-flown transition arcs between them). That system needed a Google Maps API key even for local development, and its complexity — thousands of lines of camera math — was disproportionate to what most riders actually look at while pedaling: where the road goes and how far there is left to climb. Replacing it with a plain top-down [Leaflet](https://leafletjs.com/) map removes the API key entirely (OpenStreetMap tiles are free and anonymous) and reduces "the camera" to three simple modes — follow, overview, and manual — described in [`AGENTS.md`](AGENTS.md).
@@ -175,6 +188,19 @@ The `app/` directory is a complete static site and can be served from GitHub Pag
 - `app/app.html` — GPX Rider application.
 
 The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) publishes `app/` after regenerating gallery data. To use it in a fork, select **GitHub Actions** as the Pages source in the repository settings. No API key or secret needs configuring — the map works identically everywhere.
+
+## macOS desktop app
+
+[`macos-app/`](macos-app/) is a [Tauri](https://tauri.app/) wrapper that
+loads the same `app/` — same map, HUD, and ride logic — in a native window,
+with Bluetooth trainer/heart-rate support provided by
+[tauri-plugin-web-bluetooth-api](https://github.com/ParticleG/tauri-plugin-web-bluetooth-api)
+instead of Web Bluetooth (which the embedded webview doesn't implement). See
+[`macos-app/README.md`](macos-app/README.md) for prerequisites and build
+steps, and "A native Bluetooth bridge for the macOS app" above for how the
+two are wired together. CI ([`build-macos-app.yml`](.github/workflows/build-macos-app.yml))
+builds it on every push to `main` and on PRs touching `app/`/`macos-app/`,
+uploading the `.app`/`.dmg` as a downloadable workflow artifact.
 
 ## Data and privacy
 

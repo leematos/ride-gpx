@@ -1,0 +1,47 @@
+[package]
+name = "gpx-rider"
+version = "0.1.0"
+description = "GPX Rider desktop app for macOS"
+edition = "2021"
+rust-version = "1.77.2"
+
+[lib]
+name = "gpx_rider_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# "devtools" keeps the View > Toggle Developer Tools menu item working in a
+# release build (cargo tauri build); without it open_devtools()/close_devtools()
+# only exist in debug builds. Private API on macOS — fine here since this
+# isn't distributed through the App Store.
+tauri = { version = "2", features = ["devtools"] }
+# Not published to crates.io as of this commit, so this is a git + rev
+# dependency rather than a version — see app/vendor/web-bluetooth-plugin/NOTICE.md
+# for the matching JS-side pin and how to bump both together.
+tauri-plugin-web-bluetooth = { git = "https://github.com/ParticleG/tauri-plugin-web-bluetooth-api", rev = "742b6b6210ee1e979f3fc133e7bbdf9a626da31f" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+# Surfaces the plugin's own log::info!/log::warn! calls (scan progress,
+# per-device filter matches, streaming-scan results) to stderr — otherwise
+# they're silently discarded since nothing subscribes to the `log` crate by
+# default. See "Debugging" in ../README.md for how to view this output.
+env_logger = "0.11"
+
+[[bin]]
+name = "gpx-rider"
+path = "src/main.rs"
+
+# Patches tauri-plugin-web-bluetooth's request_device() to fix a real-hardware
+# bug: it scans with ScanFilter::default() (empty services), which macOS's
+# CoreBluetooth backend turns into a `nil` services list — and macOS has a
+# long-standing bug where that silently stops delivering any advertisement
+# data at all, so every scan came back with 0 devices regardless of Bluetooth
+# permission or filters. vendor/tauri-plugin-web-bluetooth/ is the pinned
+# commit's source with that one fix applied (see the comment in its
+# src/desktop.rs); everything else is untouched. Bump both this rev and the
+# vendored copy together — see app/vendor/web-bluetooth-plugin/NOTICE.md.
+[patch."https://github.com/ParticleG/tauri-plugin-web-bluetooth-api"]
+tauri-plugin-web-bluetooth = { path = "vendor/tauri-plugin-web-bluetooth" }

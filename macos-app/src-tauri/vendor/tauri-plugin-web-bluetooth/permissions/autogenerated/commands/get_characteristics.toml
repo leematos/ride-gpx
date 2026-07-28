@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-get-characteristics"
+description = "Enables the get_characteristics command."
+commands.allow = ["get_characteristics"]
+
+[[permission]]
+identifier = "deny-get-characteristics"
+description = "Denies the get_characteristics command."
+commands.deny = ["get_characteristics"]

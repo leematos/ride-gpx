@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-get-primary-services"
+description = "Enables the get_primary_services command."
+commands.allow = ["get_primary_services"]
+
+[[permission]]
+identifier = "deny-get-primary-services"
+description = "Denies the get_primary_services command."
+commands.deny = ["get_primary_services"]

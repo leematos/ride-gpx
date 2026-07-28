@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-write-characteristic-value"
+description = "Enables the write_characteristic_value command."
+commands.allow = ["write_characteristic_value"]
+
+[[permission]]
+identifier = "deny-write-characteristic-value"
+description = "Denies the write_characteristic_value command."
+commands.deny = ["write_characteristic_value"]
