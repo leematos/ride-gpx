@@ -129,6 +129,26 @@ lines, `tauri-ble-shim.mjs`'s `[tauri-ble]` lines, and `heartrate.mjs`'s new
 diagnostics available for a hardware pairing failure, so open it before
 reproducing one.
 
+### Rust-side logs (scan/permission diagnostics)
+
+The devtools console only shows JS — the Bluetooth plugin's own
+`log::info!`/`log::warn!` calls (scan start/stop, every device the scan
+matched or didn't, why `request_device` gave up) are a separate, native-side
+log stream, invisible unless something subscribes to the `log` crate.
+`main.rs` initializes `env_logger` at "info" level by default so that
+stream goes to stderr — but stderr only reaches you if the app is launched
+from a terminal, not double-clicked from Finder or the mounted `.dmg`:
+
+```sh
+# after copying it out of the .dmg, or straight from the build output:
+/Applications/GPX\ Rider.app/Contents/MacOS/gpx-rider
+# or, for a dev build:
+./src-tauri/target/debug/gpx-rider
+```
+
+Set `RUST_LOG=debug` (or `trace`) before that command for more detail if
+"info" isn't enough.
+
 ## How the Bluetooth bridge works
 
 `trainer.mjs` and `heartrate.mjs` (both in `app/trainer/`) are written
@@ -152,13 +172,27 @@ other change to `app/` was needed.
 build: the plugin keeps one GATT connection per device (a `HashMap` keyed
 by device id on the Rust side), unlike some simpler BLE plugins that hold a
 single global connection for the whole app — in principle, a trainer and a
-heart-rate strap can be connected at the same time. Real-hardware testing
-found a case where pairing a second device (a Polar heart-rate strap, after
-a Wahoo trainer was already connected) failed; root cause not yet
-identified — see "Debugging" above for the console logging needed to
-narrow it down (device scan/selection vs. `connect_gatt`/service discovery
-vs. something specific to concurrent connections in the still-young,
-unpublished plugin).
+heart-rate strap can be connected at the same time.
+
+**Known issue: `requestDevice()` fails for every device with "No devices
+matched the provided filters."** Seen on real hardware for both a Wahoo
+KICKR (service *and* `namePrefix: "KICKR"` filters) and a Polar heart-rate
+strap (service filter only) — i.e. not specific to one device or one filter
+shape, which points at the scan itself finding zero peripherals rather than
+a filter-matching bug (traced in the plugin's `request_device` — see
+`NormalizedDeviceFilter::matches` in its `desktop.rs` — the error is
+returned whenever the scan's deadline passes with an empty match set,
+regardless of *why* it's empty). The leading hypothesis is that macOS never
+granted the app Bluetooth permission: this plugin has no `check_permissions`
+command of its own, so it relies entirely on CoreBluetooth's implicit
+"prompt on first scan" behavior plus `Info.plist`'s
+`NSBluetoothAlwaysUsageDescription` — if that prompt never fired or was
+dismissed, every scan comes back empty like this. **Check System Settings →
+Privacy & Security → Bluetooth for "GPX Rider" and make sure it's toggled
+on**; if it's missing from that list entirely, the permission prompt likely
+never triggered, and the Rust-side logs (see "Debugging" above) around
+`request_device invoked` / `Streaming scan completed | devices_found=` will
+show whether the scan loop saw any peripherals at all.
 
 **Device selection is native, not a hand-rolled dialog.** Unlike a
 straight `btleplug` wrapper, this plugin's `request_device` command runs
