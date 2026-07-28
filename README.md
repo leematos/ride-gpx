@@ -198,7 +198,9 @@ with Bluetooth trainer/heart-rate support provided by
 instead of Web Bluetooth (which the embedded webview doesn't implement). See
 [`macos-app/README.md`](macos-app/README.md) for prerequisites and build
 steps, and "A native Bluetooth bridge for the macOS app" above for how the
-two are wired together.
+two are wired together. CI ([`build-macos-app.yml`](.github/workflows/build-macos-app.yml))
+builds it on every push to `main` and on PRs touching `app/`/`macos-app/`,
+uploading the `.app`/`.dmg` as a downloadable workflow artifact.
 
 ## Data and privacy
 

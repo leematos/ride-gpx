@@ -54,7 +54,17 @@ cargo tauri build
 ```
 
 Produces a `.app` bundle and a `.dmg` under
-`src-tauri/target/release/bundle/`. This step was validated on Linux only
+`src-tauri/target/release/bundle/`.
+
+CI builds this automatically on `macos-latest` runners —
+[`.github/workflows/build-macos-app.yml`](../.github/workflows/build-macos-app.yml)
+runs on pushes to `main` and PRs touching `app/`/`macos-app/`, plus manual
+dispatch, and uploads the `.app`/`.dmg` as a downloadable workflow artifact
+(it does not create a GitHub Release or publish anywhere). That's the
+easiest way to get a real macOS build of a given commit without a Mac
+of your own.
+
+This step was validated on Linux only
 as far as `cargo check`/`cargo build --release` (the Rust code compiles and
 the plugin registers correctly) — the actual `.app`/`.dmg` bundling and any
 on-device Bluetooth testing needs to happen on macOS, which this development

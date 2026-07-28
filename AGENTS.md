@@ -552,3 +552,8 @@ and local checkout with zero setup.
   diagnostics available.
 - The deployed site is GitHub Pages via
   `.github/workflows/deploy-pages.yml` (deploys `app/` on push to `main`).
+- `.github/workflows/build-macos-app.yml` builds the [macOS desktop
+  app](macos-app/) (`cargo tauri build`, regenerating gallery data first)
+  on pushes to `main` and PRs that touch `app/`, `macos-app/`, or the
+  gallery generator, plus manual dispatch, and uploads the resulting
+  `.app`/`.dmg` as a workflow artifact — it does not publish anywhere.
