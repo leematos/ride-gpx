@@ -168,11 +168,24 @@ It's loaded via one added `<script type="module">` tag in `app/app.html`
 `@tauri-apps/api/event` to the vendored `app/vendor/tauri-api/` files — no
 other change to `app/` was needed.
 
-**Multiple simultaneous connections should work**, matching the browser
-build: the plugin keeps one GATT connection per device (a `HashMap` keyed
-by device id on the Rust side), unlike some simpler BLE plugins that hold a
-single global connection for the whole app — in principle, a trainer and a
-heart-rate strap can be connected at the same time.
+**Multiple simultaneous connections work**, matching the browser build: the
+plugin keeps one GATT connection per device (a `HashMap` keyed by device
+id on the Rust side), unlike some simpler BLE plugins that hold a single
+global connection for the whole app — a trainer and a heart-rate strap can
+be connected at the same time. This needed one more patch to actually work
+on macOS, though: the plugin's device-id function
+(`peripheral_key`) used `Peripheral::address()`, which is a real per-device
+address on Linux/Windows/Android but which btleplug's macOS backend
+unconditionally hard-codes to a placeholder zero value for *every*
+peripheral (CoreBluetooth never exposes real MAC addresses to apps at
+all — see `corebluetooth/peripheral.rs` in btleplug itself). Every device
+on macOS was colliding on the same id: connecting a KICKR right after a
+heart-rate strap reused the strap's cached device/services on the JS side
+instead of discovering the KICKR's own, so the FTMS/FE-C lookup failed
+against the *strap's* service list ("This trainer exposes neither FTMS nor
+Tacx FE-C over Bluetooth" — a real device, just the wrong one). Patched
+`peripheral_key` to use `Peripheral::id()` instead, which wraps a real
+per-device identifier on every platform btleplug supports.
 
 **"No devices matched the provided filters" for every device.** On real
 hardware, this turned out to be the Mac's Bluetooth radio simply being
@@ -219,7 +232,7 @@ payload shapes only, types dropped; `getAdapterState()` is a genuine
 addition, not part of the upstream API — see its comment). The Rust side
 goes further: `src-tauri/vendor/tauri-plugin-web-bluetooth/` is the pinned
 commit's full source, checked in and patched directly (not just a `git`
-dependency), with two changes from upstream:
+dependency), with three changes from upstream:
 
 1. `request_device`'s scan now uses the union of every filter's service
    UUIDs instead of `ScanFilter::default()`, working around the macOS
@@ -227,6 +240,9 @@ dependency), with two changes from upstream:
 2. A new `get_adapter_state` command (plus its `commands.rs` wiring and
    `permissions/` entries) exposes btleplug's actual `CentralState`, backing
    the "Bluetooth is turned off" detection above.
+3. `peripheral_key` uses `Peripheral::id()` instead of `Peripheral::address()`,
+   fixing the device-id collision described above that broke connecting a
+   second device on macOS.
 
 `Cargo.toml`'s `[patch]` section redirects the `git` dependency to this
 local, patched copy — see the comment there and

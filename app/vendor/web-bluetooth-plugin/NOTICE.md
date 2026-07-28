@@ -30,6 +30,15 @@ is that commit's full source, checked in and **patched**:
    whether adapter hardware exists, not whether its radio is on, so there
    was no way to distinguish "Bluetooth is off" from "no devices nearby."
    `getAdapterState()` in this file is the JS side of that addition.
+3. `peripheral_key()` used `Peripheral::address()` as the device's unique
+   id — a real per-device address on Linux/Windows/Android, but on macOS
+   `btleplug`'s CoreBluetooth backend unconditionally returns a placeholder
+   zero address for *every* peripheral (Apple never exposes real MAC
+   addresses to apps). Every device on macOS collided on the same id:
+   connecting a second device (e.g. a trainer, right after a heart-rate
+   strap) reused the first device's cached services on the JS side instead
+   of discovering its own. Patched to use `Peripheral::id()` instead, which
+   wraps a real per-device identifier on every platform btleplug supports.
 
 See `macos-app/src-tauri/Cargo.toml`'s `[patch]` section and the comments
 in `vendor/tauri-plugin-web-bluetooth/src/desktop.rs` for the patches
@@ -40,7 +49,7 @@ Note: as of the pinned commit, the upstream repository declares no license
 
 To update: bump the pinned commit in both
 `macos-app/src-tauri/vendor/tauri-plugin-web-bluetooth/` (re-clone at the
-new commit, then re-apply the two patches above — diff against this
+new commit, then re-apply the three patches above — diff against this
 version's `desktop.rs`/`commands.rs`/`permissions/` to see exactly what
 changed) and the `rev` comment here, then diff `guest-js/index.ts`/
 `guest-js/types.ts` at the new commit against this file and

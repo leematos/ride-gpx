@@ -421,14 +421,18 @@ internals in `trainer.mjs` (hardware-safety, documented in place).
   `requestDevice()` in the shim is a thin pass-through rather than a
   hand-rolled scan+picker UI. Not published to crates.io or npm as of this
   writing: `Cargo.toml` depends on it via `git` + a pinned `rev`, patched
-  (a real macOS CoreBluetooth scanning bug, plus an added `get_adapter_state`
-  command so `ensureBluetoothReady()` in the shim can tell "Bluetooth is
-  off" apart from "no devices nearby" instead of the shim burning a full
-  scan timeout on an unhelpful "no devices found") via the checked-in,
-  patched source in `macos-app/src-tauri/vendor/tauri-plugin-web-bluetooth/`
-  and a Cargo `[patch]`. Its JS bindings are hand-ported (not vendored
-  verbatim) into `app/vendor/web-bluetooth-plugin/`. See
-  `macos-app/README.md` and the vendored/ported-dependency notices in
+  three times over the checked-in source in
+  `macos-app/src-tauri/vendor/tauri-plugin-web-bluetooth/` (wired in via a
+  Cargo `[patch]`) — a real macOS CoreBluetooth empty-scan bug; an added
+  `get_adapter_state` command so `ensureBluetoothReady()` in the shim can
+  tell "Bluetooth is off" apart from "no devices nearby" instead of the
+  shim burning a full scan timeout on an unhelpful "no devices found"; and
+  a device-id collision (`peripheral_key` used `Peripheral::address()`,
+  which btleplug's macOS backend hard-codes to a placeholder for every
+  device, so connecting a second device reused the first one's cached
+  services). Its JS bindings are hand-ported (not vendored verbatim) into
+  `app/vendor/web-bluetooth-plugin/`. See `macos-app/README.md` and the
+  vendored/ported-dependency notices in
   `app/vendor/web-bluetooth-plugin/` and `app/vendor/tauri-api/`.
 - **Map & rider marker.** GPX Rider renders a plain top-down 2D slippy map —
   [Leaflet](https://leafletjs.com/) with OpenStreetMap raster tiles — instead

@@ -1273,8 +1273,20 @@ fn notification_key(device_id: &str, characteristic_uuid: &str) -> String {
   format!("{device_id}:{characteristic_uuid}")
 }
 
+// GPX Rider patch: peripheral.address() is a real, unique per-device MAC on
+// Linux/Windows/Android, but on macOS CoreBluetooth never exposes real MAC
+// addresses to apps at all — btleplug's macOS backend's Peripheral::address()
+// unconditionally returns BDAddr::default() (a zero placeholder) for every
+// device (see corebluetooth/peripheral.rs). Using it as this plugin's device
+// key meant every peripheral on macOS collided on the same id: connecting a
+// second device (e.g. a trainer, after a heart-rate strap) reused the first
+// device's cached FakeBluetoothDevice/services on the JS side instead of
+// discovering its own. peripheral.id() wraps a real per-device identifier on
+// every platform btleplug supports (a stable UUID on macOS, the actual
+// address on the others) and is the identifier btleplug itself is designed
+// to be used for exactly this purpose.
 fn peripheral_key(peripheral: &Peripheral) -> String {
-  peripheral.address().to_string()
+  peripheral.id().to_string()
 }
 
 fn parse_uuid(input: &str) -> Result<Uuid> {
