@@ -128,6 +128,7 @@ function ensureGlobalListeners() {
       onGattServerDisconnected(({ deviceId }) => {
         const device = devicesById.get(deviceId);
         if (!device) return;
+        console.debug(`[tauri-ble] disconnected: ${device.name || deviceId}`);
         device._connected = false;
         device.dispatchEvent(new Event("gattserverdisconnected"));
       }),
@@ -140,6 +141,10 @@ function getPrimaryService(device, serviceUuid) {
   const wanted = normalizeUuid(serviceUuid);
   const match = (device._services || []).find((service) => service.uuid.toLowerCase() === wanted);
   if (!match) {
+    console.warn(
+      `[tauri-ble] service ${wanted} not found on ${device.name || device.id}; discovered services:`,
+      (device._services || []).map((service) => service.uuid),
+    );
     throw new DOMException(`No Services matching UUID ${wanted} found in Device.`, "NotFoundError");
   }
   return {
@@ -162,9 +167,14 @@ async function connectFakeDevice(device) {
     throw new Error("Turn on Bluetooth to connect.");
   }
 
+  console.debug(`[tauri-ble] connecting GATT: ${device.name || device.id}`);
   const info = await connectGATT(device.id);
   device._services = info.services;
   device._connected = info.connected;
+  console.debug(
+    `[tauri-ble] connected: ${device.name || device.id}; services:`,
+    info.services.map((service) => service.uuid),
+  );
   return device.gatt;
 }
 
@@ -188,11 +198,13 @@ async function requestDevice(options = {}) {
     throw new Error("Turn on Bluetooth to pair a device.");
   }
 
+  console.debug("[tauri-ble] requesting device", options.filters);
   const picked = await pluginRequestDevice({
     filters: toPluginFilters(options.filters),
     optionalServices: options.optionalServices?.map(normalizeUuid),
     scanTimeoutMs: SCAN_TIMEOUT_MS,
   });
+  console.debug(`[tauri-ble] device picked: ${picked.name || picked.id}`);
   return devicesById.get(picked.id) || new FakeBluetoothDevice(picked.id, picked.name || picked.id);
 }
 

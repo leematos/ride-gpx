@@ -105,6 +105,26 @@ the box. Replace them with real artwork before shipping:
 cargo tauri icon path/to/logo.png
 ```
 
+## Debugging
+
+The window has no chrome of its own (no toolbar), so `src-tauri/src/lib.rs`
+builds a standard native menu bar with the usual App/Edit/Window items plus
+a **View** menu:
+
+- **Reload** (⌘R) — reloads the webview, same as a browser refresh.
+- **Toggle Developer Tools** (⌘⌥I) — opens the WebKit inspector (console,
+  network, elements, etc.), same as Chrome/Safari devtools. Enabled in
+  release builds too via the `devtools` feature on the `tauri` dependency
+  in `Cargo.toml` (normally devtools are debug-build-only) — this is a
+  private API on macOS, fine here since the app isn't distributed through
+  the App Store.
+
+`trainer.mjs`/`heartrate.mjs`'s existing `[trainer]`-style `console.debug`
+lines, `tauri-ble-shim.mjs`'s `[tauri-ble]` lines, and `heartrate.mjs`'s new
+`[heartrate]` lines all show up in that console — they're the only field
+diagnostics available for a hardware pairing failure, so open it before
+reproducing one.
+
 ## How the Bluetooth bridge works
 
 `trainer.mjs` and `heartrate.mjs` (both in `app/trainer/`) are written
@@ -124,11 +144,17 @@ It's loaded via one added `<script type="module">` tag in `app/app.html`
 `@tauri-apps/api/event` to the vendored `app/vendor/tauri-api/` files — no
 other change to `app/` was needed.
 
-**Multiple simultaneous connections work**, matching the browser build:
-the plugin keeps one GATT connection per device (a `HashMap` keyed by
-device id on the Rust side), unlike some simpler BLE plugins that hold a
-single global connection for the whole app. A trainer and a heart-rate
-strap can be connected at the same time.
+**Multiple simultaneous connections should work**, matching the browser
+build: the plugin keeps one GATT connection per device (a `HashMap` keyed
+by device id on the Rust side), unlike some simpler BLE plugins that hold a
+single global connection for the whole app — in principle, a trainer and a
+heart-rate strap can be connected at the same time. Real-hardware testing
+found a case where pairing a second device (a Polar heart-rate strap, after
+a Wahoo trainer was already connected) failed; root cause not yet
+identified — see "Debugging" above for the console logging needed to
+narrow it down (device scan/selection vs. `connect_gatt`/service discovery
+vs. something specific to concurrent connections in the still-young,
+unpublished plugin).
 
 **Device selection is native, not a hand-rolled dialog.** Unlike a
 straight `btleplug` wrapper, this plugin's `request_device` command runs

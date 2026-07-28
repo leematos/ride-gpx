@@ -13,7 +13,11 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
-tauri = { version = "2", features = [] }
+# "devtools" keeps the View > Toggle Developer Tools menu item working in a
+# release build (cargo tauri build); without it open_devtools()/close_devtools()
+# only exist in debug builds. Private API on macOS — fine here since this
+# isn't distributed through the App Store.
+tauri = { version = "2", features = ["devtools"] }
 # Not published to crates.io as of this commit, so this is a git + rev
 # dependency rather than a version — see app/vendor/web-bluetooth-plugin/NOTICE.md
 # for the matching JS-side pin and how to bump both together.
