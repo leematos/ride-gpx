@@ -6,15 +6,11 @@ on:
     paths:
       - "app/**"
       - "macos-app/**"
-      - "scripts/generate_gallery_json.py"
-      - "scripts/tuning_config.py"
       - ".github/workflows/build-macos-app.yml"
   pull_request:
     paths:
       - "app/**"
       - "macos-app/**"
-      - "scripts/generate_gallery_json.py"
-      - "scripts/tuning_config.py"
       - ".github/workflows/build-macos-app.yml"
   workflow_dispatch:
 
@@ -24,9 +20,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Generate gallery data
-        run: make gallery-data
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
