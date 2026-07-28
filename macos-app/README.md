@@ -72,6 +72,29 @@ environment does not have. In particular, the native device-picker window
 (a separate webview registered by the plugin) and the `web-bluetooth`
 CSP/capability wiring below are unverified outside a real macOS build.
 
+### "\*.app is damaged and can't be opened" / "\*.dmg is damaged"
+
+Expected, not a bug in the build: CI produces an ad-hoc-signed but
+**unnotarized** build (no Apple Developer certificate is configured), and
+macOS — Apple Silicon especially — shows this "damaged" message for
+quarantined, unnotarized downloads instead of the older "unidentified
+developer" prompt. The file isn't actually corrupt. Clear the quarantine
+flag before opening it:
+
+```sh
+xattr -cr "~/Downloads/GPX Rider_*.dmg"
+# or, after dragging the app out of the mounted dmg:
+xattr -cr "/Applications/GPX Rider.app"
+```
+
+Shipping a build that doesn't need this requires enrolling in the Apple
+Developer Program, adding a Developer ID Application certificate + notarization
+credentials as GitHub secrets, and wiring `tauri.conf.json`'s
+`bundle.macOS.signingIdentity` (and notarizing via `xcrun notarytool` or
+`tauri-action`'s built-in signing support) into
+[`build-macos-app.yml`](../.github/workflows/build-macos-app.yml) — not set
+up here since it needs the maintainer's own certificate/credentials.
+
 ### Icons
 
 `src-tauri/icons/` ships placeholder icons (a simple amber dot on the app's
