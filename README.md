@@ -126,10 +126,10 @@ app](macos-app/) wraps the same `app/` in a [Tauri](https://tauri.app/)
 webview, which has no Web Bluetooth implementation of its own, so it needed
 a bridge rather than a rewrite:
 
-- **A polyfill, not a fork.** [`app/trainer/tauri-ble-shim.mjs`](app/trainer/tauri-ble-shim.mjs) reimplements the exact slice of `navigator.bluetooth` those two modules use — `requestDevice()`/`getDevices()`, `device.gatt`, `service.getCharacteristic()`, notifications, `writeValue()` — backed by [tauri-plugin-blec](https://github.com/MnlPhlp/tauri-plugin-blec) (a [btleplug](https://github.com/deviceplug/btleplug)-based native BLE client). `trainer.mjs`/`heartrate.mjs` needed zero changes; the shim only activates when it detects it's running inside Tauri, and is otherwise a no-op in the browser build.
-- **Its own device picker.** Web Bluetooth's native device chooser doesn't exist outside a browser, so the shim scans via `startScan()` and renders a small in-page dialog instead, matching filters (service UUIDs, name prefixes) the same way `requestDevice()`'s options do.
-- **One connection at a time.** tauri-plugin-blec keeps a single active GATT connection for the whole app rather than one per device, so the desktop build can't hold a trainer and a heart-rate strap connected simultaneously the way the browser build can — documented in [`macos-app/README.md`](macos-app/README.md).
-- **Vendored JS bindings.** `@mnlphlp/plugin-blec` and the `core` (invoke/`Channel`) module of `@tauri-apps/api` are both published as pre-built ES modules, so they're vendored under `app/vendor/` exactly like Leaflet — no bundler, no `node_modules`, even for the Tauri-facing code.
+- **A polyfill, not a fork.** [`app/trainer/tauri-ble-shim.mjs`](app/trainer/tauri-ble-shim.mjs) reimplements the exact slice of `navigator.bluetooth` those two modules use — `requestDevice()`/`getDevices()`, `device.gatt`, `service.getCharacteristic()`, notifications, `writeValue()` — backed by [tauri-plugin-web-bluetooth-api](https://github.com/ParticleG/tauri-plugin-web-bluetooth-api) (a [btleplug](https://github.com/deviceplug/btleplug)-based native BLE client that itself mirrors the Web Bluetooth API). `trainer.mjs`/`heartrate.mjs` needed zero changes; the shim only activates when it detects it's running inside Tauri, and is otherwise a no-op in the browser build.
+- **A native device picker, not a hand-rolled one.** Rather than the shim scanning and rendering its own in-page chooser, device selection happens on the Rust side: `lib.rs` configures the plugin's `NativeDialogSelectionHandler`, which pops a small native window styled after Chromium's device chooser. `requestDevice()` in the shim is a thin pass-through to that command.
+- **Multiple simultaneous connections, matching the browser build.** The plugin keeps one GATT connection per device (keyed by device id) rather than a single global connection for the whole app, so the desktop build can hold a trainer *and* a heart-rate strap connected at once, same as the browser build.
+- **Vendored where possible, hand-ported where necessary.** The `core`/`event` modules of `@tauri-apps/api` are published pre-built ES modules, so they're vendored under `app/vendor/` exactly like Leaflet. The Bluetooth plugin itself isn't published to crates.io or npm as of this writing — `Cargo.toml` pins it via `git` + a commit `rev`, and its thin JS bindings are hand-ported (not vendored verbatim) into `app/vendor/web-bluetooth-plugin/`, documented there for re-syncing when the pin is bumped.
 
 ### Why a top-down map, and why vendored Leaflet
 
@@ -194,8 +194,8 @@ The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) publish
 [`macos-app/`](macos-app/) is a [Tauri](https://tauri.app/) wrapper that
 loads the same `app/` — same map, HUD, and ride logic — in a native window,
 with Bluetooth trainer/heart-rate support provided by
-[tauri-plugin-blec](https://github.com/MnlPhlp/tauri-plugin-blec) instead of
-Web Bluetooth (which the embedded webview doesn't implement). See
+[tauri-plugin-web-bluetooth-api](https://github.com/ParticleG/tauri-plugin-web-bluetooth-api)
+instead of Web Bluetooth (which the embedded webview doesn't implement). See
 [`macos-app/README.md`](macos-app/README.md) for prerequisites and build
 steps, and "A native Bluetooth bridge for the macOS app" above for how the
 two are wired together.
@@ -216,7 +216,6 @@ Map tiles are fetched anonymously from OpenStreetMap's tile servers; no key, acc
 - Smart ETA needs about a minute of real pedaling before it trusts the measured pace; until then it projects from current speed.
 - Calories are derived from power, or taken from FTMS Expended Energy when an FTMS trainer reports it (FE-C trainers report no energy field, so calories come from power).
 - Heart rate comes from a paired strap or, as a fallback, the trainer's own heart-rate field.
-- The [macOS desktop app](macos-app/) can have a trainer *or* a heart-rate strap connected, but not both at once — its native Bluetooth backend (tauri-plugin-blec) supports only one active connection at a time, unlike the browser build.
 
 ## Tested hardware
 

@@ -14,7 +14,10 @@ tauri-build = { version = "2", features = [] }
 
 [dependencies]
 tauri = { version = "2", features = [] }
-tauri-plugin-blec = "0.12"
+# Not published to crates.io as of this commit, so this is a git + rev
+# dependency rather than a version — see app/vendor/web-bluetooth-plugin/NOTICE.md
+# for the matching JS-side pin and how to bump both together.
+tauri-plugin-web-bluetooth = { git = "https://github.com/ParticleG/tauri-plugin-web-bluetooth-api", rev = "742b6b6210ee1e979f3fc133e7bbdf9a626da31f" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 

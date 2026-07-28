@@ -1,10 +1,11 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "identifier": "default",
-  "description": "Capabilities for the main window: default Tauri core APIs plus the blec Bluetooth plugin used by app/trainer/tauri-ble-shim.mjs.",
-  "windows": ["main"],
+  "description": "Capabilities for the main window and the Bluetooth plugin's native device-picker window: default Tauri core APIs, core events (needed by the picker dialog), and the web-bluetooth plugin used by app/trainer/tauri-ble-shim.mjs.",
+  "windows": ["main", "web-bluetooth-selector-*"],
   "permissions": [
     "core:default",
-    "blec:default"
+    "core:event:default",
+    "web-bluetooth:default"
   ]
 }
