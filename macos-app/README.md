@@ -68,9 +68,13 @@ This step was validated on Linux only
 as far as `cargo check`/`cargo build --release` (the Rust code compiles and
 the plugin registers correctly) — the actual `.app`/`.dmg` bundling and any
 on-device Bluetooth testing needs to happen on macOS, which this development
-environment does not have. In particular, the native device-picker window
-(a separate webview registered by the plugin) and the `web-bluetooth`
-CSP/capability wiring below are unverified outside a real macOS build.
+environment does not have. Real-hardware testing already caught two CSP
+gaps this way (wrong tile-CDN domain and a missing `ipc:` allowance for
+Tauri's own IPC calls — see `tauri.conf.json`'s `app.security.csp`, now
+deliberately broadened to `https:`/`ipc:` rather than an exact per-domain
+allowlist, since this app has no backend/account data for a strict CSP to
+protect and hand-picking domains had already gone wrong twice), so treat
+anything not exercised on a real Mac yet as unverified until it is.
 
 ### "\*.app is damaged and can't be opened" / "\*.dmg is damaged"
 
