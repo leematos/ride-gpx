@@ -47,7 +47,7 @@ route); the gallery *code* lives in `app/gallery-ui/` — keep them apart.
 | `app/map/` | Map rendering | `map-init.mjs` (creates the Leaflet map + OpenStreetMap tile layer — no API key needed), `map-view.mjs` (follow/overview/manual mode state machine: pan-to-rider, fit-bounds overview, manual-drag capture — see "Map & rider marker" below), `route-render.mjs` (grade-colored route polylines + the rider marker), `route-style.mjs` (pure route segment styling), `screenshot.mjs` (viewport JPG via tab capture) |
 | `app/route/` | Route processing | `route.mjs` (GPX parsing, enrichment, interpolation, grade, heading; tested), `climb-signal.mjs` (pure resample/smooth/rolling-grade elevation-signal helpers behind climb detection; tested), `climbs.mjs` (sustained-climb detection — the fatigue-pressure state machine built on `climb-signal.mjs`; tested), `difficulty.mjs` (classification from distance + gain; tested), `route-load.mjs` (GPX file/URL intake, `applyGpxText` route-swap sequence, once-per-load route overview), `climbs-ui.mjs` (climb/segment focus, live climb status, the HUD climb/segment banner), `profile.mjs` (elevation profile canvas drawing + hit-testing), `profile-ui.mjs` (profile rendering + hover/seek/drag-select wiring) |
 | `app/ride/` | Ride execution & telemetry | `movement.mjs` (the movement loop `tick`, simulation toggle, pedaling hysteresis, reset, seek), `eta.mjs` (flat-equivalent pace ETA model; tested), `ride-ui.mjs` (`updateRideUi`, the per-tick UI driver), `telemetry-ui.mjs` (trainer/HR callbacks, HR source resolution, calories/timer, telemetry readouts), `training-zones.mjs` (HR/power zones, fullscreen zone meters, zone summaries), `recorder.mjs` (ride sample bucket), `recording-ui.mjs` (FIT card, download, clear), `fit.mjs` (FIT encoder — must stay sport=cycling, sub_sport=virtual_activity; tested) |
-| `app/trainer/` | Hardware | `trainer.mjs` (trainer pairing + reconnect + protocol detection; FTMS over Web Bluetooth: write queue, Indoor Bike Data; routes to the FE-C backend for Tacx), `trainer-fec.mjs` (Tacx FE-C over BLE backend: telemetry notifications + Track Resistance grade writes on service 6e40fec1), `fec.mjs` (pure ANT+ FE-C codec: ANT framing + page 16/25/51 encode/decode — tested), `heartrate.mjs` (BLE heart-rate strap, service 0x180D) |
+| `app/trainer/` | Hardware | `trainer.mjs` (trainer pairing + reconnect + protocol detection; FTMS over Web Bluetooth: write queue, Indoor Bike Data; routes to the FE-C backend for Tacx), `trainer-fec.mjs` (Tacx FE-C over BLE backend: telemetry notifications + Track Resistance grade writes on service 6e40fec1), `fec.mjs` (pure ANT+ FE-C codec: ANT framing + page 16/25/51 encode/decode — tested), `heartrate.mjs` (BLE heart-rate strap, service 0x180D), `tauri-ble-shim.mjs` (polyfills `navigator.bluetooth` on top of tauri-plugin-blec for the macOS app in `macos-app/`; a no-op in a real browser — see "A native Bluetooth bridge for the macOS app" in `README.md`), `ble-uuid.mjs` (pure UUID-normalization + `requestDevice()`-style filter matching behind the shim — tested) |
 | `app/settings/` | Settings | `settings-ui.mjs` (settings dialog shell + every panel except the map action-bar controls: units, rider profile, display & HUD toggles, rendering, screenshot settings) |
 | `app/storage/` | Storage & persistence | `storage.mjs` (IndexedDB behind a sync cache, localStorage fallback + migration; tested), `persistence.mjs` (`restoreSettings`/`saveSettings`, `restoreSavedRide`/`saveRide` — the one deliberately cross-cutting module) |
 | `app/hud/` | Shared HUD layout | `screen-manager.mjs` (**the central HUD layout manager** — see "Map HUD layout" below), `map-hud.mjs` (clock chip, HUD tile order/visibility + drag-reorder, tile layout, dock collapse, fullscreen enter/exit, map screenshot action), `theater-mode.mjs` (exact-size recording viewport) |
@@ -404,6 +404,22 @@ internals in `trainer.mjs` (hardware-safety, documented in place).
   FE-C carries no calories field, so calories come from power for those
   trainers. `TACX_FEC_DEFAULT_CRR` (the rolling-resistance coefficient sent
   with each grade) lives in `tuning.yaml`.
+- **macOS app Bluetooth bridge.** `trainer.mjs`/`heartrate.mjs` are written
+  directly against `navigator.bluetooth` and stay that way — the
+  [`macos-app/`](macos-app/) Tauri wrapper (loading the same `app/` in a
+  native window) supplies that API instead of a real browser, via
+  `tauri-ble-shim.mjs` polyfilling it on top of
+  [tauri-plugin-blec](https://github.com/MnlPhlp/tauri-plugin-blec). The
+  shim is a no-op outside Tauri (`window.__TAURI_INTERNALS__` absent) and is
+  the *only* app-side change (one `<script type="module">` + one import map
+  in `app.html`, both inert in a browser). Because tauri-plugin-blec keeps a
+  single global GATT connection rather than one per device, the macOS app
+  supports a trainer *or* a heart-rate strap at a time, not both
+  simultaneously like the browser build — connecting the second disconnects
+  the first via the same `gattserverdisconnected` path a real out-of-range
+  drop already uses, so neither feature module needed special-casing. See
+  `macos-app/README.md` and the vendored-dependency notices in
+  `app/vendor/plugin-blec/` and `app/vendor/tauri-api/`.
 - **Map & rider marker.** GPX Rider renders a plain top-down 2D slippy map —
   [Leaflet](https://leafletjs.com/) with OpenStreetMap raster tiles — instead
   of a 3D camera. There is no tilt, range, heading, or camera physics: panning
@@ -524,7 +540,7 @@ and local checkout with zero setup.
   instead of eyeballing the change.
 - Unit tests cover the pure modules (`route`, `units`, `fit`, `eta`,
   `climbs`, `difficulty`, `demo`, `route-style`, `fec`, `yaml`, `storage`,
-  `profile`). Add tests alongside any new pure logic.
+  `profile`, `ble-uuid`). Add tests alongside any new pure logic.
 - Web Bluetooth requires Chrome/Edge; hardware paths can't be unit-tested.
   When changing `trainer.mjs`/`heartrate.mjs`, preserve the existing
   logging (`[trainer]` console.debug lines) — it's the only field

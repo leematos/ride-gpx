@@ -118,6 +118,19 @@ Most modern smart trainers speak the standard Fitness Machine Service (FTMS) ove
 
 The pure framing and page codec is isolated in [`app/trainer/fec.mjs`](app/trainer/fec.mjs) and covered by unit tests for checksums, frame round-tripping, grade encoding across the clamped range, and telemetry decoding. The Bluetooth backend that composes it lives in [`app/trainer/trainer-fec.mjs`](app/trainer/trainer-fec.mjs); protocol detection and routing stay in [`app/trainer/trainer.mjs`](app/trainer/trainer.mjs). The rolling-resistance coefficient sent with each grade command is tunable under `trainer` in [`app/core/tuning.yaml`](app/core/tuning.yaml).
 
+### A native Bluetooth bridge for the macOS app
+
+`app/trainer/trainer.mjs` and `app/trainer/heartrate.mjs` are written
+directly against the standard Web Bluetooth API. The [macOS desktop
+app](macos-app/) wraps the same `app/` in a [Tauri](https://tauri.app/)
+webview, which has no Web Bluetooth implementation of its own, so it needed
+a bridge rather than a rewrite:
+
+- **A polyfill, not a fork.** [`app/trainer/tauri-ble-shim.mjs`](app/trainer/tauri-ble-shim.mjs) reimplements the exact slice of `navigator.bluetooth` those two modules use — `requestDevice()`/`getDevices()`, `device.gatt`, `service.getCharacteristic()`, notifications, `writeValue()` — backed by [tauri-plugin-blec](https://github.com/MnlPhlp/tauri-plugin-blec) (a [btleplug](https://github.com/deviceplug/btleplug)-based native BLE client). `trainer.mjs`/`heartrate.mjs` needed zero changes; the shim only activates when it detects it's running inside Tauri, and is otherwise a no-op in the browser build.
+- **Its own device picker.** Web Bluetooth's native device chooser doesn't exist outside a browser, so the shim scans via `startScan()` and renders a small in-page dialog instead, matching filters (service UUIDs, name prefixes) the same way `requestDevice()`'s options do.
+- **One connection at a time.** tauri-plugin-blec keeps a single active GATT connection for the whole app rather than one per device, so the desktop build can't hold a trainer and a heart-rate strap connected simultaneously the way the browser build can — documented in [`macos-app/README.md`](macos-app/README.md).
+- **Vendored JS bindings.** `@mnlphlp/plugin-blec` and the `core` (invoke/`Channel`) module of `@tauri-apps/api` are both published as pre-built ES modules, so they're vendored under `app/vendor/` exactly like Leaflet — no bundler, no `node_modules`, even for the Tauri-facing code.
+
 ### Why a top-down map, and why vendored Leaflet
 
 GPX Rider used to render routes on Google's Photorealistic 3D Maps with a full follow-camera/cinematic-overview system (chase physics, terrain-avoidance lift, orbit/fly-by/fly-over flight patterns, physically-flown transition arcs between them). That system needed a Google Maps API key even for local development, and its complexity — thousands of lines of camera math — was disproportionate to what most riders actually look at while pedaling: where the road goes and how far there is left to climb. Replacing it with a plain top-down [Leaflet](https://leafletjs.com/) map removes the API key entirely (OpenStreetMap tiles are free and anonymous) and reduces "the camera" to three simple modes — follow, overview, and manual — described in [`AGENTS.md`](AGENTS.md).
@@ -176,6 +189,17 @@ The `app/` directory is a complete static site and can be served from GitHub Pag
 
 The included [GitHub Pages workflow](.github/workflows/deploy-pages.yml) publishes `app/` after regenerating gallery data. To use it in a fork, select **GitHub Actions** as the Pages source in the repository settings. No API key or secret needs configuring — the map works identically everywhere.
 
+## macOS desktop app
+
+[`macos-app/`](macos-app/) is a [Tauri](https://tauri.app/) wrapper that
+loads the same `app/` — same map, HUD, and ride logic — in a native window,
+with Bluetooth trainer/heart-rate support provided by
+[tauri-plugin-blec](https://github.com/MnlPhlp/tauri-plugin-blec) instead of
+Web Bluetooth (which the embedded webview doesn't implement). See
+[`macos-app/README.md`](macos-app/README.md) for prerequisites and build
+steps, and "A native Bluetooth bridge for the macOS app" above for how the
+two are wired together.
+
 ## Data and privacy
 
 GPX Rider has no user accounts and no application backend. Routes, settings, ride progress, sensor preferences, and recorded samples remain in browser storage. Trainer and heart-rate communication happens directly between the browser and the selected Bluetooth devices.
@@ -192,6 +216,7 @@ Map tiles are fetched anonymously from OpenStreetMap's tile servers; no key, acc
 - Smart ETA needs about a minute of real pedaling before it trusts the measured pace; until then it projects from current speed.
 - Calories are derived from power, or taken from FTMS Expended Energy when an FTMS trainer reports it (FE-C trainers report no energy field, so calories come from power).
 - Heart rate comes from a paired strap or, as a fallback, the trainer's own heart-rate field.
+- The [macOS desktop app](macos-app/) can have a trainer *or* a heart-rate strap connected, but not both at once — its native Bluetooth backend (tauri-plugin-blec) supports only one active connection at a time, unlike the browser build.
 
 ## Tested hardware
 

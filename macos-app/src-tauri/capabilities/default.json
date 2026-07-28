@@ -1,0 +1,10 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "default",
+  "description": "Capabilities for the main window: default Tauri core APIs plus the blec Bluetooth plugin used by app/trainer/tauri-ble-shim.mjs.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "blec:default"
+  ]
+}
