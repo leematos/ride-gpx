@@ -411,8 +411,13 @@ internals in `trainer.mjs` (hardware-safety, documented in place).
   `tauri-ble-shim.mjs` polyfilling it on top of
   [tauri-plugin-web-bluetooth-api](https://github.com/ParticleG/tauri-plugin-web-bluetooth-api).
   The shim is a no-op outside Tauri (`window.__TAURI_INTERNALS__` absent)
-  and is the *only* app-side change (one `<script type="module">` + one
-  import map in `app.html`, both inert in a browser). Unlike simpler BLE
+  and is the *only* app-side change. Its `<script type="module">` tag and
+  import map are never even present in `app.html`'s source or the
+  browser/Pages build — `.github/workflows/build-macos-app.yml` injects
+  them with `scripts/inject_macos_bluetooth_bridge.py` right after
+  checkout, before `cargo tauri build` bundles `app/` (see
+  `macos-app/README.md`'s "Run in development" for running this locally for
+  `cargo tauri dev`). Unlike simpler BLE
   plugins that hold one global connection for the whole app, this plugin
   keeps a GATT connection per device (keyed by device id), so the macOS app
   supports a trainer *and* a heart-rate strap connected simultaneously,

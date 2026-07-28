@@ -21,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Inject the Tauri Bluetooth bridge into app.html
+        run: python3 scripts/inject_macos_bluetooth_bridge.py
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
 

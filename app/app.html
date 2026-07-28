@@ -657,18 +657,6 @@
       </div>
     </dialog>
 
-    <!-- Only present inside the macOS Tauri wrapper (macos-app/); a no-op in
-         a regular browser. Loaded before app.js so navigator.bluetooth is
-         polyfilled by the time trainer.mjs/heartrate.mjs use it. -->
-    <script type="importmap">
-      {
-        "imports": {
-          "@tauri-apps/api/core": "./vendor/tauri-api/core.js",
-          "@tauri-apps/api/event": "./vendor/tauri-api/event.js"
-        }
-      }
-    </script>
-    <script src="./trainer/tauri-ble-shim.mjs" type="module"></script>
     <script src="./app.js" type="module"></script>
   </body>
 </html>

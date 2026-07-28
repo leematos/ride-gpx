@@ -27,23 +27,31 @@ see "How the Bluetooth bridge works" below.
 
 ## Run in development
 
-From this directory:
+`app/app.html` doesn't reference the Bluetooth bridge at all in git — it's
+injected only at CI build time (see "How the Bluetooth bridge works"
+below), so `make run`'s plain checkout won't have it either. Inject it
+locally first, from the repo root:
+
+```sh
+python3 scripts/inject_macos_bluetooth_bridge.py
+make run
+```
+
+Then, from this directory, in another terminal:
 
 ```sh
 cargo tauri dev
 ```
 
-This expects the GPX Rider dev server to already be running (it's what
-`tauri.conf.json`'s `devUrl` points at):
+`cargo tauri dev` opens a native window loading
+`http://127.0.0.1:5173/app/app.html` (what `tauri.conf.json`'s `devUrl`
+points at) with hot classic reload (edit files under `app/`, reload the
+window). When you're done and want to go back to testing the plain browser
+build, revert the injected copy:
 
 ```sh
-# from the repo root, in another terminal
-make run
+git checkout -- app/app.html
 ```
-
-`cargo tauri dev` opens a native window loading
-`http://127.0.0.1:5173/app/app.html` with hot classic reload (edit files
-under `app/`, reload the window).
 
 ## Build a macOS app
 
@@ -163,10 +171,21 @@ when it detects it's running inside Tauri (`window.__TAURI_INTERNALS__`).
 In a real browser it's a no-op — `trainer.mjs`/`heartrate.mjs` are
 completely unmodified.
 
-It's loaded via one added `<script type="module">` tag in `app/app.html`
-(before `app.js`) plus an import map resolving `@tauri-apps/api/core` and
-`@tauri-apps/api/event` to the vendored `app/vendor/tauri-api/` files — no
-other change to `app/` was needed.
+It's loaded via a `<script type="module">` tag (before `app.js`) plus an
+import map resolving `@tauri-apps/api/core` and `@tauri-apps/api/event` to
+the vendored `app/vendor/tauri-api/` files — but that markup lives in
+neither `app/app.html` nor any file under `app/` at all. `.github/workflows/
+build-macos-app.yml` injects it into `app/app.html` with
+[`scripts/inject_macos_bluetooth_bridge.py`](../scripts/inject_macos_bluetooth_bridge.py)
+right after checkout, before `cargo tauri build` copies `app/` into the
+bundle via `frontendDist`. The browser/GitHub Pages build never runs that
+script, so its `app.html` never has this markup at all — not even inert,
+no-op markup — rather than relying on the shim's own `isTauri` no-op check
+to keep it invisible. `app/trainer/tauri-ble-shim.mjs` and its supporting
+files (`ble-uuid.mjs`, `app/vendor/tauri-api/`, `app/vendor/web-bluetooth-plugin/`)
+are still ordinary files in `app/` — served and shipped either way, just
+never *referenced* unless something injects the script tag that imports
+them. See "Run in development" above for running this injection locally.
 
 **Multiple simultaneous connections work**, matching the browser build: the
 plugin keeps one GATT connection per device (a `HashMap` keyed by device
