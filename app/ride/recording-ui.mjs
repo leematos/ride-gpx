@@ -30,7 +30,10 @@ export function updateRecordingUi() {
   els.clearRideDataBtn.disabled = summary.sampleCount === 0;
 }
 
-export function downloadFitFile() {
+// promptClear: false skips the post-download "start fresh?" confirm — used
+// when a caller (e.g. a GPX swap) is about to clear the log itself regardless
+// of the user's answer, so a second confirm would just be redundant.
+export function downloadFitFile({ promptClear = true } = {}) {
   const samples = rideLogSamples();
   if (samples.length < 2) {
     updateProgressLabel("Not enough recorded ride data yet — ride a little first.");
@@ -77,6 +80,8 @@ export function downloadFitFile() {
   link.click();
   link.remove();
   URL.revokeObjectURL(url);
+
+  if (!promptClear) return;
 
   // Give the browser a beat to hand the file off before asking.
   window.setTimeout(() => {

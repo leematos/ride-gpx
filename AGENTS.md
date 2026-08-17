@@ -188,6 +188,14 @@ internals in `trainer.mjs` (hardware-safety, documented in place).
   the route does not touch the recorded bucket. The bucket only grows while
   the rider is actually moving, and it survives reloads via `storage.mjs`
   (IndexedDB — a long ride no longer risks localStorage's ~5 MB quota).
+  Loading a *different* GPX is not a progress change, though — it starts an
+  unrelated ride, and a FIT file can only describe one route. `applyGpxText`
+  (`route-load.mjs`) calls `confirmRideDataBeforeRouteChange` before applying
+  the new route: if the bucket still has samples, it offers to download them
+  as a FIT file first (`downloadFitFile({ promptClear: false })`, which skips
+  its own post-download "clear?" confirm), then always clears the bucket —
+  otherwise the next FIT export would splice two different routes' samples
+  together.
 - **FIT export** must stay a *virtual ride* (sport 2 / sub_sport 58) or
   Strava/Garmin will misclassify uploads. `fit.mjs` is a hand-rolled
   little-endian encoder — if you touch it, keep the CRC and header tests
