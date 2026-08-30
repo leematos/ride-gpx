@@ -47,6 +47,8 @@ It is built for people who want to:
 
 Not on the bike? Use the Simulation card's **Start** button to preview the route at a fixed speed. Real pedaling automatically stops a running simulation and takes priority.
 
+Loading a different GPX route always starts a fresh recording, since a FIT export can only describe one route. If the current recording still has data, GPX Rider asks first — download it as a FIT file, or discard it — before applying the new route.
+
 ## Route intelligence
 
 When a route loads, GPX Rider shows its name, distance, ascent, descent, terrain class, and difficulty. The classification uses distance and elevation gain only; it does not depend on power, speed, or weather.

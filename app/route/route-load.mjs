@@ -11,6 +11,8 @@ import { enterOverviewMode } from "../map/map-view.mjs";
 import { saveRide } from "../storage/persistence.mjs";
 import { renderProfile } from "./profile-ui.mjs";
 import { updateRideUi } from "../ride/ride-ui.mjs";
+import { clearRideLog, hasRideData, rideLogSummary } from "../ride/recorder.mjs";
+import { downloadFitFile, updateRecordingUi } from "../ride/recording-ui.mjs";
 import {
   enrichRoute,
   parseGpx,
@@ -19,7 +21,7 @@ import {
 } from "./route.mjs";
 import { renderRoute } from "../map/route-render.mjs";
 import { els, state, updateProgressLabel } from "../core/state.mjs";
-import { formatAltitude, formatDistance } from "../core/units.mjs";
+import { formatAltitude, formatDistance, formatDuration } from "../core/units.mjs";
 
 export async function loadGpxFile(event) {
   const [file] = event.target.files;
@@ -42,6 +44,30 @@ function filenameToRouteName(filename) {
   return filename.replace(/\.[^./\\]+$/, "").trim() || null;
 }
 
+// A GPX swap starts an unrelated ride: the recorder's buffer must not carry
+// samples from the outgoing route into the new one, or a FIT export would
+// silently splice two different routes' coordinates together (issue: FIT
+// export showing "previous GPX data" after switching routes mid-session).
+// Give the rider a chance to keep the outgoing data as a FIT download before
+// it's discarded, then always clear it — the new ride starts from an empty
+// buffer either way.
+function confirmRideDataBeforeRouteChange() {
+  if (!hasRideData()) return;
+
+  const summary = rideLogSummary();
+  const description =
+    `${formatDistance(summary.distanceMeters, state.distanceUnits)} / ` +
+    `${formatDuration(summary.timerSeconds, state.durationFormat)}`;
+  const shouldDownload = window.confirm(
+    `Loading a new route will clear the current recorded ride data (${description}).\n\n` +
+    "Click OK to download it as a FIT file first, or Cancel to discard it and continue.",
+  );
+  if (shouldDownload) downloadFitFile({ promptClear: false });
+
+  clearRideLog();
+  updateRecordingUi();
+}
+
 export function applyGpxText(text, { overrideName = null, fallbackName = null, galleryMetadata = null } = {}) {
   const { points: route, name: gpxName } = parseGpx(text);
 
@@ -49,6 +75,8 @@ export function applyGpxText(text, { overrideName = null, fallbackName = null, g
     updateProgressLabel("That GPX file does not contain enough track points.");
     return;
   }
+
+  confirmRideDataBeforeRouteChange();
 
   state.route = enrichRoute(route);
   state.routeName = overrideName || gpxName || fallbackName;
